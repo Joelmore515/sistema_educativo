@@ -1,11 +1,11 @@
 const QRCode = require('qrcode');
+const { randomUUID } = require('crypto');
 
 /**
  * Genera un UUID único y su representación en código QR (Base64)
  */
 const generateQR = async () => {
-  const { v4: uuidv4 } = await import('uuid');
-  const uuid = uuidv4();
+  const uuid = randomUUID();
 
   try {
     const qrDataURL = await QRCode.toDataURL(uuid);
