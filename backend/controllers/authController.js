@@ -56,6 +56,11 @@ exports.login = async (req, res) => {
     }
 
     // Crear Token
+    // Verificar que la variable de entorno JWT_SECRET esté configurada
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({ message: 'JWT_SECRET no está configurado en las variables de entorno' });
+    }
+
     const token = jwt.sign(
       { id: user.id, role: user.Role.name },
       process.env.JWT_SECRET,
