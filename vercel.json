@@ -9,6 +9,16 @@
     "routes": [
         {
             "src": "/(.*)",
+            "methods": ["OPTIONS"],
+            "headers": {
+                "Access-Control-Allow-Origin": "https://www.controlasistencia.pro",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization"
+            },
+            "dest": "backend/server.js"
+        },
+        {
+            "src": "/(.*)",
             "dest": "backend/server.js"
         }
     ]
