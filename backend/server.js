@@ -10,7 +10,17 @@ const app = express();
 require('./models');
 
 // Middlewares
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://www.controlasistencia.pro',
+    'https://controlasistencia.pro'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
+app.options('*', cors());
 app.use(express.json());
 
 // Inicialización de base de datos
