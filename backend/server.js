@@ -85,6 +85,7 @@ app.use('/api/meetings', require('./routes/meetingRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
 app.use('/api/dni', require('./routes/dniRoutes'));
 app.use('/api/qr', require('./routes/qrRoutes'));
+app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 
 // Ruta principal
 app.get('/', (req, res) => {
