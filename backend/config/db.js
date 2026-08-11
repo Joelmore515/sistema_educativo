@@ -1,4 +1,5 @@
 const { Sequelize } = require('sequelize');
+require('mysql2'); // fuerza a Vercel a incluir este paquete en el bundle serverless
 
 require('dotenv').config();
 
