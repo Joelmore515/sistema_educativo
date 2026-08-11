@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const sequelize = require('./config/db');
 
@@ -9,18 +10,23 @@ const app = express();
 // Inicializar modelos y asociaciones
 require('./models');
 
-// Middlewares
-app.use(cors({
+// Configuración CORS
+const corsOptions = {
   origin: [
     'https://www.controlasistencia.pro',
     'https://controlasistencia.pro'
   ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
-}));
+};
 
-app.options('*', cors());
+// Middlewares - CORS debe ir primero que todo
+app.use(cors(corsOptions));
+
+// Manejar preflight OPTIONS explícitamente - responder de inmediato sin tocar la BD
+app.options('*', cors(corsOptions));
+
 app.use(express.json());
 
 // Inicialización de base de datos
