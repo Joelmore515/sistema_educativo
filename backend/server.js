@@ -24,9 +24,6 @@ const corsOptions = {
 // Middlewares - CORS debe ir primero que todo
 app.use(cors(corsOptions));
 
-// Manejar preflight OPTIONS explícitamente - responder de inmediato sin tocar la BD
-app.options('*', cors(corsOptions));
-
 app.use(express.json());
 
 // Inicialización de base de datos
