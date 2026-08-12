@@ -57,7 +57,7 @@ const Register = () => {
             className="bg-white p-4 rounded-3xl shadow-2xl mb-8"
           >
             <img
-              src="src/assets/logo_colegio.jpg"
+              src={logoColegio}
               alt="EduControl Logo"
               className="h-32 w-auto object-contain rounded-xl"
             />
@@ -114,7 +114,7 @@ const Register = () => {
           {/* Logo solo visible en móvil */}
           <div className="lg:hidden flex justify-center mb-8">
             <img
-              src="src/assets/logo_colegio.jpg"
+              src={logoColegio}
               alt="EduControl Logo"
               className="h-24 w-auto drop-shadow-md rounded-2xl"
             />

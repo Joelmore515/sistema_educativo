@@ -732,6 +732,8 @@
   font-size: 0.62rem;
   font-weight: 700;
   color: #475569;
+  flex-shrink: 0;
+  min-width: 64px;
 }
 
 @media (max-width: 1024px) {
@@ -751,30 +753,55 @@
 
 @media (max-width: 768px) {
   .dashboard-shell {
-    display: block;
+    display: flex;
+    flex-direction: column;
   }
 
   .dashboard-header {
     align-items: flex-start;
     flex-direction: column;
+    gap: 0.6rem;
   }
 
   .header-actions {
     width: 100%;
-    justify-content: space-between;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
   }
 
   .welcome-panel {
-    padding: 1.3rem;
+    padding: 1rem;
+    grid-template-columns: 1fr;
   }
 
   .stats-grid,
-  .modules-grid {
+  .modules-grid,
+  .content-grid {
     grid-template-columns: 1fr;
+    gap: 0.9rem;
   }
 
   .profile-pill {
     flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .dashboard-main {
+    padding: 1rem;
+  }
+
+  .chart-bars {
+    height: 160px;
+  }
+
+  .chart-fill {
+    max-width: 28px;
+  }
+
+  .welcome-copy p {
+    max-width: 100%;
   }
 }
 
