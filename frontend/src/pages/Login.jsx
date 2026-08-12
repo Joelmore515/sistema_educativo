@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { LogIn, Mail, Lock, ShieldCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
+import logoColegio from '../assets/logo_colegio.jpg';
 
 const Login = () => {
   const [email, setEmail] = useState('');

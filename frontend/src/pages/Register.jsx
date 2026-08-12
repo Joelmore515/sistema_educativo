@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
 import { UserPlus, ArrowLeft, Mail, Lock, ShieldCheck, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
+import logoColegio from '../assets/logo_colegio.jpg';
 
 const Register = () => {
   const [email, setEmail] = useState('');

@@ -11,8 +11,14 @@ router.get('/stats', async (req, res) => {
 
     // 2. Today's attendance percentage
     const today = new Date();
-    // formatear a YYYY-MM-DD para compatibilidad con db
-    const todayStr = today.toISOString().split('T')[0];
+    // formatear a YYYY-MM-DD de forma segura (zona horaria local)
+    const getLocalYMD = (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    const todayStr = getLocalYMD(today);
 
     const attendancesToday = await Attendance.count({
       where: {
@@ -72,7 +78,7 @@ router.get('/stats', async (req, res) => {
     for (let i = 0; i <= 5; i++) {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
-      const dStr = d.toISOString().split('T')[0];
+      const dStr = getLocalYMD(d);
       
       const dayAttendances = await Attendance.count({
         where: {
@@ -95,7 +101,7 @@ router.get('/stats', async (req, res) => {
     for (let i = 0; i < daysPassedThisWeek; i++) {
       const d = new Date(lastWeekMonday);
       d.setDate(lastWeekMonday.getDate() + i);
-      const dStr = d.toISOString().split('T')[0];
+      const dStr = getLocalYMD(d);
       
       const dayAttendances = await Attendance.count({
         where: {
