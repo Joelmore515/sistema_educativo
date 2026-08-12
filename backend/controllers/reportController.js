@@ -3,6 +3,34 @@ const Attendance = require('../models/Attendance');
 const { Op } = require('sequelize');
 const sequelize = require('../config/db');
 
+const getLatestAttendanceByStudentAndDate = (records = []) => {
+  const latestByKey = new Map();
+
+  records.forEach((record) => {
+    const studentId = record.student_id;
+    const dateKey = record.attendance_date
+      ? new Date(record.attendance_date).toISOString().slice(0, 10)
+      : record.check_in
+        ? new Date(record.check_in).toISOString().slice(0, 10)
+        : null;
+
+    if (!studentId || !dateKey) {
+      return;
+    }
+
+    const mapKey = `${studentId}-${dateKey}`;
+    const existing = latestByKey.get(mapKey);
+    const existingTime = existing ? new Date(existing.updatedAt || existing.check_in || existing.attendance_date || 0).getTime() : -Infinity;
+    const currentTime = new Date(record.updatedAt || record.check_in || record.attendance_date || 0).getTime();
+
+    if (!existing || currentTime >= existingTime) {
+      latestByKey.set(mapKey, record);
+    }
+  });
+
+  return Array.from(latestByKey.values());
+};
+
 exports.getGeneralStats = async (req, res) => {
   try {
     const today = new Date();
@@ -10,23 +38,24 @@ exports.getGeneralStats = async (req, res) => {
 
     const totalStudents = await Student.count();
 
+    // formatear a YYYY-MM-DD de forma segura
+    const getLocalYMD = (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     // Asistencia de hoy
-    const todayString = today.toISOString().split('T')[0];
+    const todayString = getLocalYMD(today);
     const attendanceToday = await Attendance.findAll({
       where: {
         attendance_date: todayString
-      }
+      },
+      order: [['updatedAt', 'DESC'], ['check_in', 'DESC']]
     });
 
-    // Deduplicate by student_id
-    const uniqueAttendances = {};
-    attendanceToday.forEach(a => {
-      if (!uniqueAttendances[a.student_id]) {
-        uniqueAttendances[a.student_id] = a;
-      }
-    });
-
-    const uniqueList = Object.values(uniqueAttendances);
+    const uniqueList = getLatestAttendanceByStudentAndDate(attendanceToday);
     const present = uniqueList.filter(a => a.status === 'presente').length;
     const tardy = uniqueList.filter(a => a.status === 'tardanza').length;
     let absent = totalStudents - (present + tardy);
@@ -43,13 +72,19 @@ exports.getGeneralStats = async (req, res) => {
     }
 
     const statsByDay = await Promise.all(last7Days.map(async (date) => {
-        const dateString = date.toISOString().split('T')[0];
+        const dateString = getLocalYMD(date);
 
-        const count = await Attendance.count({
+        const dayRecords = await Attendance.findAll({
             where: {
                 attendance_date: dateString
-            }
+            },
+            order: [['updatedAt', 'DESC'], ['check_in', 'DESC']]
         });
+
+        const uniqueDayRecords = getLatestAttendanceByStudentAndDate(dayRecords);
+        const count = uniqueDayRecords.filter(record =>
+            record.status === 'presente' || record.status === 'tardanza'
+        ).length;
 
         return {
             name: date.toLocaleDateString('es-ES', { weekday: 'short' }),

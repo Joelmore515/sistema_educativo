@@ -4,6 +4,34 @@ const { Op } = require('sequelize');
 const { Student, Attendance } = require('../models');
 const Meeting = require('../models/Meeting');
 
+const getLatestAttendanceByStudentAndDate = (records = []) => {
+  const latestByKey = new Map();
+
+  records.forEach((record) => {
+    const studentId = record.student_id;
+    const dateKey = record.attendance_date
+      ? new Date(record.attendance_date).toISOString().slice(0, 10)
+      : record.check_in
+        ? new Date(record.check_in).toISOString().slice(0, 10)
+        : null;
+
+    if (!studentId || !dateKey) {
+      return;
+    }
+
+    const mapKey = `${studentId}-${dateKey}`;
+    const existing = latestByKey.get(mapKey);
+    const existingTime = existing ? new Date(existing.updatedAt || existing.check_in || existing.attendance_date || 0).getTime() : -Infinity;
+    const currentTime = new Date(record.updatedAt || record.check_in || record.attendance_date || 0).getTime();
+
+    if (!existing || currentTime >= existingTime) {
+      latestByKey.set(mapKey, record);
+    }
+  });
+
+  return Array.from(latestByKey.values());
+};
+
 router.get('/stats', async (req, res) => {
   try {
     // 1. Total students
@@ -20,12 +48,17 @@ router.get('/stats', async (req, res) => {
     };
     const todayStr = getLocalYMD(today);
 
-    const attendancesToday = await Attendance.count({
+    const attendanceToday = await Attendance.findAll({
       where: {
         attendance_date: todayStr,
-        status: { [Op.in]: ['presente', 'tardanza'] }
-      }
+      },
+      order: [['updatedAt', 'DESC'], ['check_in', 'DESC']]
     });
+
+    const uniqueAttendancesToday = getLatestAttendanceByStudentAndDate(attendanceToday);
+    const attendancesToday = uniqueAttendancesToday.filter(record =>
+      record.status === 'presente' || record.status === 'tardanza'
+    ).length;
 
     const attendancePercentage = totalStudents > 0 
       ? Math.round((attendancesToday / totalStudents) * 100) 
@@ -79,15 +112,20 @@ router.get('/stats', async (req, res) => {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
       const dStr = getLocalYMD(d);
-      
-      const dayAttendances = await Attendance.count({
+
+      const dayRecords = await Attendance.findAll({
         where: {
           attendance_date: dStr,
-          status: { [Op.in]: ['presente', 'tardanza'] }
-        }
+        },
+        order: [['updatedAt', 'DESC'], ['check_in', 'DESC']]
       });
+      const uniqueDayRecords = getLatestAttendanceByStudentAndDate(dayRecords);
+      const dayAttendances = uniqueDayRecords.filter(record =>
+        record.status === 'presente' || record.status === 'tardanza'
+      ).length;
+
       performanceBars.push(totalStudents > 0 ? Math.round((dayAttendances / totalStudents) * 100) : 0);
-      
+
       if (i < daysPassedThisWeek) {
         currentWeekTotalAttendances += dayAttendances;
       }
@@ -102,13 +140,19 @@ router.get('/stats', async (req, res) => {
       const d = new Date(lastWeekMonday);
       d.setDate(lastWeekMonday.getDate() + i);
       const dStr = getLocalYMD(d);
-      
-      const dayAttendances = await Attendance.count({
+
+      const dayRecords = await Attendance.findAll({
         where: {
           attendance_date: dStr,
-          status: { [Op.in]: ['presente', 'tardanza'] }
-        }
+        },
+        order: [['updatedAt', 'DESC'], ['check_in', 'DESC']]
       });
+
+      const uniqueDayRecords = getLatestAttendanceByStudentAndDate(dayRecords);
+      const dayAttendances = uniqueDayRecords.filter(record =>
+        record.status === 'presente' || record.status === 'tardanza'
+      ).length;
+
       lastWeekTotalAttendances += dayAttendances;
     }
     
