@@ -2,41 +2,61 @@ const { Attendance, Student, Parent, User } = require('../models');
 const { sendEmail } = require('../utils/mailer');
 const { sendWhatsApp } = require('../utils/wapsat');
 const { Op } = require('sequelize');
+const PERU_TZ = 'America/Lima';
 
+// Devuelve año/mes/día/hora/minuto/segundo de una fecha, según la zona horaria de Perú,
+// sin depender de la configuración de zona horaria del servidor (crítico en Vercel/serverless).
+const getPeruDateParts = (date = new Date()) => {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: PERU_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(date).reduce((acc, p) => {
+    if (p.type !== 'literal') acc[p.type] = p.value;
+    return acc;
+  }, {});
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: parts.hour === '24' ? 0 : Number(parts.hour),
+    minute: Number(parts.minute),
+    second: Number(parts.second)
+  };
+};
+
+// Convierte una fecha a su hora local formateada como texto, siempre en zona horaria de Perú,
+// sin importar en qué zona horaria corra el proceso Node.js.
+const getPeruTimeString = (date = new Date()) =>
+  date.toLocaleTimeString('es-PE', { timeZone: PERU_TZ });
+
+// Interpreta un string "YYYY-MM-DD" (sin hora) como esa fecha en Perú, y lo representa
+// como un instante fijo al mediodía UTC para evitar que, al convertir de vuelta a hora
+// Perú, el resultado se corra al día anterior o siguiente.
 const parseLocalDateString = (dateStr) => {
   if (!dateStr) return new Date();
   if (typeof dateStr === 'string' && dateStr.includes('-') && !dateStr.includes('T')) {
     const [year, month, day] = dateStr.split('-').map(Number);
-    return new Date(year, month - 1, day);
+    return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
   }
   return new Date(dateStr);
 };
 
-const getDayRange = (dateValue = new Date()) => {
-  const start = new Date(dateValue);
-  start.setHours(0, 0, 0, 0);
-
-  const end = new Date(dateValue);
-  end.setHours(23, 59, 59, 999);
-
-  return { start, end };
-};
-
 const formatLocalDate = (date = new Date()) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  const { year, month, day } = getPeruDateParts(date);
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 };
 
 const formatLocalDateTime = (date = new Date()) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  const { year, month, day, hour, minute, second } = getPeruDateParts(date);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${year}-${pad(month)}-${pad(day)} ${pad(hour)}:${pad(minute)}:${pad(second)}`;
 };
 
 const parseLocalDateTime = (value) => {
@@ -64,8 +84,11 @@ exports.scanQR = async (req, res) => {
     }
 
     const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const { year, month, day } = getPeruDateParts(now);
+    // Construimos el rango del día de Perú, expresado correctamente como instantes UTC.
+    // Perú es UTC-5 fijo (no tiene horario de verano).
+    const startOfDay = new Date(Date.UTC(year, month - 1, day, 5, 0, 0, 0));      // 00:00 Perú = 05:00 UTC
+    const endOfDay = new Date(Date.UTC(year, month - 1, day + 1, 4, 59, 59, 999)); // 23:59:59 Perú
 
     // Buscar si ya tiene un ingreso hoy sin salida
     let attendance = await Attendance.findOne({
@@ -85,9 +108,8 @@ exports.scanQR = async (req, res) => {
       // Registrar Ingreso
       type = 'INGRESO';
 
-      // Lógica simple de tardanza (Ejemplo: después de las 8:15 AM)
-      const hours = now.getHours();
-      const minutes = now.getMinutes();
+      // Lógica simple de tardanza (Ejemplo: después de las 8:15 AM, hora Perú)
+      const { hour: hours, minute: minutes } = getPeruDateParts(now);
       let status = 'presente';
       if (hours > 8 || (hours === 8 && minutes > 15)) {
         status = 'tardanza';
@@ -114,10 +136,13 @@ exports.scanQR = async (req, res) => {
       await attendance.save();
     }
 
+    // Hora en formato legible, siempre en zona horaria de Perú (independiente de dónde corra el servidor)
+    const peruTime = getPeruTimeString(now);
+
     // --- NOTIFICACIONES ---
     const parent = student.Parent;
     if (parent) {
-      const message = `Hola ${parent.first_name}, se ha registrado el ${type} de su hijo(a) ${student.first_name} ${student.last_name} a las ${now.toLocaleTimeString()}. Estado: ${attendance.status}.`;
+      const message = `Hola ${parent.first_name}, se ha registrado el ${type} de su hijo(a) ${student.first_name} ${student.last_name} a las ${peruTime}. Estado: ${attendance.status}.`;
 
       // Enviar Email
       if (parent.User && parent.User.email) {
@@ -135,7 +160,7 @@ exports.scanQR = async (req, res) => {
     res.json({
       message: `Registro de ${type} exitoso`,
       student: `${student.first_name} ${student.last_name}`,
-      time: now.toLocaleTimeString(),
+      time: peruTime,
       status: attendance.status
     });
 
@@ -161,7 +186,6 @@ exports.createAbsence = async (req, res) => {
     }
 
     const targetDate = parseLocalDateString(date);
-    const { start, end } = getDayRange(targetDate);
 
     for (const currentStudentId of uniqueStudentIds) {
       const student = await Student.findByPk(currentStudentId);
@@ -185,6 +209,8 @@ exports.createAbsence = async (req, res) => {
 
     const createdAttendances = [];
     for (const currentStudentId of uniqueStudentIds) {
+      const { year: jYear, month: jMonth, day: jDay } = getPeruDateParts(targetDate);
+
       const attendance = await Attendance.create({
         student_id: currentStudentId,
         attendance_date: formatLocalDate(targetDate),
@@ -193,7 +219,7 @@ exports.createAbsence = async (req, res) => {
         is_absence: true,
         is_justified: Boolean(justification_reason),
         justification_reason: justification_reason || null,
-        justification_date: justification_reason ? new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 0, 0, 0) : null,
+        justification_date: justification_reason ? new Date(Date.UTC(jYear, jMonth - 1, jDay, 5, 0, 0, 0)) : null,
         notes: notes || null
       });
 

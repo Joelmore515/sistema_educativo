@@ -2,6 +2,7 @@ const Student = require('../models/Student');
 const Attendance = require('../models/Attendance');
 const { Op } = require('sequelize');
 const sequelize = require('../config/db');
+const PERU_TZ = 'America/Lima';
 
 const getLatestAttendanceByStudentAndDate = (records = []) => {
   const latestByKey = new Map();
@@ -38,12 +39,15 @@ exports.getGeneralStats = async (req, res) => {
 
     const totalStudents = await Student.count();
 
-    // formatear a YYYY-MM-DD de forma segura
+    
     const getLocalYMD = (d) => {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: PERU_TZ,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      return formatter.format(d); // ya devuelve YYYY-MM-DD
     };
 
     // Asistencia de hoy
