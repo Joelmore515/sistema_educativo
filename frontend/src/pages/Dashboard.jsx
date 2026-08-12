@@ -21,6 +21,7 @@ import ParentManagement from './ParentManagement';
 import AttendancePanel from './AttendancePanel';
 import Reports from './Reports';
 import MeetingManagement from './MeetingManagement';
+import MeetingAttendancePanel from './MeetingAttendancePanel';
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -41,7 +42,8 @@ const Dashboard = () => {
     totalStudents: 0,
     attendancePercentage: 0,
     upcomingMeetings: 0,
-    totalReports: 0
+    totalReports: 0,
+    attendanceTrend: 0
   });
   const [recentActivity, setRecentActivity] = useState([]);
   const [performanceBars, setPerformanceBars] = useState([0, 0, 0, 0, 0, 0]);
@@ -211,9 +213,13 @@ const Dashboard = () => {
                         <p className="label-muted">Vista general</p>
                         <h3>Asistencia por semana</h3>
                       </div>
-                      <div className="trend-badge">
-                        <ArrowUpRight size={14} />
-                        +12.1%
+                      <div className={`trend-badge ${statsData.attendanceTrend < 0 ? 'bg-red-100 text-red-600' : ''}`}>
+                        {statsData.attendanceTrend >= 0 ? (
+                          <ArrowUpRight size={14} />
+                        ) : (
+                          <ArrowUpRight size={14} className="rotate-90" />
+                        )}
+                        {statsData.attendanceTrend > 0 ? '+' : ''}{statsData.attendanceTrend}%
                       </div>
                     </div>
 
@@ -290,6 +296,7 @@ const Dashboard = () => {
           <Route path="students" element={<StudentManagement />} />
           <Route path="parents" element={<ParentManagement />} />
           <Route path="meetings" element={<MeetingManagement />} />
+          <Route path="meetings/:id/attendance" element={<MeetingAttendancePanel />} />
           <Route path="attendance" element={<AttendancePanel />} />
           <Route path="reports" element={<Reports />} />
         </Routes>

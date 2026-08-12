@@ -9,4 +9,11 @@ router.post('/scan', meetingController.scanParentQR);
 router.put('/:id', meetingController.updateMeeting);
 router.delete('/:id', meetingController.deleteMeeting);
 
+// Attendance routes
+router.get('/:id/attendance', meetingController.getMeetingAttendance);
+router.post('/:id/attendance', meetingController.manualAddAttendance);
+router.put('/attendance/:attendanceId', meetingController.updateAttendance);
+router.delete('/attendance/:attendanceId', meetingController.deleteAttendance);
+
+
 module.exports = router;

@@ -58,11 +58,20 @@ router.get('/stats', async (req, res) => {
       };
     });
 
-    // 5. Performance Bars (last 6 days attendance %)
+    // 5. Performance Bars (current week attendance %: Monday to Saturday)
     const performanceBars = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
+    const currentDayOfWeek = today.getDay(); // 0: Sunday, 1: Monday, ... 6: Saturday
+    const diffToMonday = currentDayOfWeek === 0 ? -6 : 1 - currentDayOfWeek; 
+    
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + diffToMonday);
+
+    let currentWeekTotalAttendances = 0;
+    let daysPassedThisWeek = currentDayOfWeek === 0 ? 6 : currentDayOfWeek; // 1 to 6 (Monday to Saturday)
+
+    for (let i = 0; i <= 5; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
       const dStr = d.toISOString().split('T')[0];
       
       const dayAttendances = await Attendance.count({
@@ -72,7 +81,40 @@ router.get('/stats', async (req, res) => {
         }
       });
       performanceBars.push(totalStudents > 0 ? Math.round((dayAttendances / totalStudents) * 100) : 0);
+      
+      if (i < daysPassedThisWeek) {
+        currentWeekTotalAttendances += dayAttendances;
+      }
     }
+    
+    // 6. Trend calculation (this week vs last week)
+    let lastWeekTotalAttendances = 0;
+    const lastWeekMonday = new Date(monday);
+    lastWeekMonday.setDate(lastWeekMonday.getDate() - 7);
+    
+    for (let i = 0; i < daysPassedThisWeek; i++) {
+      const d = new Date(lastWeekMonday);
+      d.setDate(lastWeekMonday.getDate() + i);
+      const dStr = d.toISOString().split('T')[0];
+      
+      const dayAttendances = await Attendance.count({
+        where: {
+          attendance_date: dStr,
+          status: { [Op.in]: ['presente', 'tardanza'] }
+        }
+      });
+      lastWeekTotalAttendances += dayAttendances;
+    }
+    
+    const currentWeekAvg = totalStudents > 0 && daysPassedThisWeek > 0 
+      ? (currentWeekTotalAttendances / (totalStudents * daysPassedThisWeek)) * 100 
+      : 0;
+      
+    const lastWeekAvg = totalStudents > 0 && daysPassedThisWeek > 0
+      ? (lastWeekTotalAttendances / (totalStudents * daysPassedThisWeek)) * 100
+      : 0;
+      
+    const attendanceTrend = Number((currentWeekAvg - lastWeekAvg).toFixed(1));
 
     res.json({
       success: true,
@@ -81,7 +123,8 @@ router.get('/stats', async (req, res) => {
           totalStudents,
           attendancePercentage,
           upcomingMeetings,
-          totalReports: 12 // Placeholder for reports
+          totalReports: 0, // Generated reports count not tracked in DB
+          attendanceTrend
         },
         recentActivity: formattedActivity,
         performanceBars

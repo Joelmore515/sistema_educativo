@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
-import { Calendar, Search, Plus, X, Loader2, Users, Edit2, Trash2 } from 'lucide-react';
+import { Calendar, Search, Plus, X, Loader2, Users, Edit2, Trash2, ClipboardList } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const MeetingManagement = () => {
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const navigate = useNavigate();
   
   const initialFormState = {
     title: '',
@@ -200,6 +202,13 @@ const MeetingManagement = () => {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => navigate(`/dashboard/meetings/${meeting.id}/attendance`)}
+                          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          title="Ver asistencia"
+                        >
+                          <ClipboardList size={18} />
+                        </button>
                         <button
                           onClick={() => handleEdit(meeting)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"

@@ -135,3 +135,102 @@ exports.deleteMeeting = async (req, res) => {
     res.status(500).json({ message: 'Error al eliminar reunión', error: error.message });
   }
 };
+
+exports.getMeetingAttendance = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // 1. Check if meeting exists
+    const meeting = await Meeting.findByPk(id);
+    if (!meeting) {
+      return res.status(404).json({ message: 'Reunión no encontrada' });
+    }
+
+    // 2. Fetch all parents
+    const parents = await Parent.findAll();
+
+    // 3. Fetch attendances for this meeting
+    const attendances = await MeetingAttendance.findAll({
+      where: { meeting_id: id }
+    });
+
+    // 4. Map parents with their attendance status
+    const attendanceMap = {};
+    attendances.forEach(att => {
+      attendanceMap[att.parent_id] = att;
+    });
+
+    const result = parents.map(parent => {
+      const att = attendanceMap[parent.id];
+      return {
+        parent_id: parent.id,
+        first_name: parent.first_name,
+        last_name: parent.last_name,
+        dni: parent.dni,
+        attendance_id: att ? att.id : null,
+        status: att ? 'Presente' : 'Ausente',
+        check_in: att ? att.check_in : null,
+        check_out: att ? att.check_out : null
+      };
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener asistencia de la reunión', error: error.message });
+  }
+};
+
+exports.manualAddAttendance = async (req, res) => {
+  try {
+    const { id } = req.params; // meeting_id
+    const { parent_id, check_in, check_out } = req.body;
+
+    const attendance = await MeetingAttendance.create({
+      meeting_id: id,
+      parent_id,
+      check_in: check_in || new Date(),
+      check_out: check_out || null
+    });
+
+    res.status(201).json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al agregar asistencia', error: error.message });
+  }
+};
+
+exports.updateAttendance = async (req, res) => {
+  try {
+    const { attendanceId } = req.params;
+    const { check_in, check_out } = req.body;
+
+    const attendance = await MeetingAttendance.findByPk(attendanceId);
+    if (!attendance) {
+      return res.status(404).json({ message: 'Registro de asistencia no encontrado' });
+    }
+
+    await attendance.update({
+      check_in: check_in !== undefined ? check_in : attendance.check_in,
+      check_out: check_out !== undefined ? check_out : attendance.check_out
+    });
+
+    res.json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al actualizar asistencia', error: error.message });
+  }
+};
+
+exports.deleteAttendance = async (req, res) => {
+  try {
+    const { attendanceId } = req.params;
+    
+    const attendance = await MeetingAttendance.findByPk(attendanceId);
+    if (!attendance) {
+      return res.status(404).json({ message: 'Registro de asistencia no encontrado' });
+    }
+
+    await attendance.destroy();
+    res.json({ message: 'Asistencia eliminada exitosamente' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al eliminar asistencia', error: error.message });
+  }
+};
