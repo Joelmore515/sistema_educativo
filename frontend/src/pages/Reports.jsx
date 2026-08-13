@@ -24,11 +24,16 @@ const Reports = () => {
 
   if (loading) return <div className="p-10 text-center">Cargando estadísticas...</div>;
 
+  const safeStats = stats || {
+    summary: { total: 0, present: 0, tardy: 0, absent: 0 },
+    chartData: []
+  };
+
   const COLORS = ['#10b981', '#f59e0b', '#ef4444'];
   const pieData = [
-    { name: 'Presentes', value: stats.summary.present },
-    { name: 'Tardanzas', value: stats.summary.tardy },
-    { name: 'Ausentes', value: stats.summary.absent },
+    { name: 'Presentes', value: safeStats.summary.present || 0 },
+    { name: 'Tardanzas', value: safeStats.summary.tardy || 0 },
+    { name: 'Ausentes', value: safeStats.summary.absent || 0 },
   ];
 
   return (
@@ -49,10 +54,10 @@ const Reports = () => {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatCard title="Total Estudiantes" value={stats.summary.total} icon={Users} color="text-primary-600" bg="bg-primary-50" />
-        <StatCard title="Presentes Hoy" value={stats.summary.present} icon={CheckCircle} color="text-emerald-600" bg="bg-emerald-50" />
-        <StatCard title="Tardanzas Hoy" value={stats.summary.tardy} icon={Clock} color="text-amber-600" bg="bg-amber-50" />
-        <StatCard title="Ausentes Hoy" value={stats.summary.absent} icon={AlertTriangle} color="text-red-600" bg="bg-red-50" />
+        <StatCard title="Total Estudiantes" value={safeStats.summary.total || 0} icon={Users} color="text-primary-600" bg="bg-primary-50" />
+        <StatCard title="Presentes Hoy" value={safeStats.summary.present || 0} icon={CheckCircle} color="text-emerald-600" bg="bg-emerald-50" />
+        <StatCard title="Tardanzas Hoy" value={safeStats.summary.tardy || 0} icon={Clock} color="text-amber-600" bg="bg-amber-50" />
+        <StatCard title="Ausentes Hoy" value={safeStats.summary.absent || 0} icon={AlertTriangle} color="text-red-600" bg="bg-red-50" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -64,7 +69,7 @@ const Reports = () => {
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats.chartData}>
+              <BarChart data={safeStats.chartData || []}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
                 <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />

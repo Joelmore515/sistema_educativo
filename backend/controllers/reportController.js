@@ -34,12 +34,8 @@ const getLatestAttendanceByStudentAndDate = (records = []) => {
 
 exports.getGeneralStats = async (req, res) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     const totalStudents = await Student.count();
 
-    
     const getLocalYMD = (d) => {
       const formatter = new Intl.DateTimeFormat('en-CA', {
         timeZone: PERU_TZ,
@@ -50,11 +46,48 @@ exports.getGeneralStats = async (req, res) => {
       return formatter.format(d); // ya devuelve YYYY-MM-DD
     };
 
+    const getPeruDateParts = (date = new Date()) => {
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: PERU_TZ,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      const parts = formatter.formatToParts(date).reduce((acc, p) => {
+        if (p.type !== 'literal') acc[p.type] = p.value;
+        return acc;
+      }, {});
+      return {
+        year: Number(parts.year),
+        month: Number(parts.month),
+        day: Number(parts.day),
+        hour: parts.hour === '24' ? 0 : Number(parts.hour),
+        minute: Number(parts.minute),
+        second: Number(parts.second)
+      };
+    };
+
     // Asistencia de hoy
+    const today = new Date();
+    const { year, month, day } = getPeruDateParts(today);
     const todayString = getLocalYMD(today);
+    const startOfDay = new Date(Date.UTC(year, month - 1, day, 5, 0, 0, 0));      // 00:00 Perú = 05:00 UTC
+    const endOfDay = new Date(Date.UTC(year, month - 1, day + 1, 4, 59, 59, 999)); // 23:59:59 Perú
+
     const attendanceToday = await Attendance.findAll({
       where: {
-        attendance_date: todayString
+        [Op.or]: [
+          { attendance_date: todayString },
+          sequelize.where(
+            sequelize.fn('DATE', sequelize.col('check_in')),
+            Op.eq,
+            todayString
+          )
+        ]
       },
       order: [['updatedAt', 'DESC'], ['check_in', 'DESC']]
     });
@@ -80,7 +113,14 @@ exports.getGeneralStats = async (req, res) => {
 
         const dayRecords = await Attendance.findAll({
             where: {
-                attendance_date: dateString
+              [Op.or]: [
+                { attendance_date: dateString },
+                sequelize.where(
+                  sequelize.fn('DATE', sequelize.col('check_in')),
+                  Op.eq,
+                  dateString
+                )
+              ]
             },
             order: [['updatedAt', 'DESC'], ['check_in', 'DESC']]
         });

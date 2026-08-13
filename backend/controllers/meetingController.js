@@ -1,6 +1,8 @@
 const Meeting = require('../models/Meeting');
 const MeetingAttendance = require('../models/MeetingAttendance');
 const Parent = require('../models/Parent');
+const Student = require('../models/Student');
+const StudentParent = require('../models/StudentParent');
 const sequelize = require('../config/db');
 
 const parseLocalDateString = (dateStr) => {
@@ -61,9 +63,27 @@ exports.scanParentQR = async (req, res) => {
   try {
     const { uuid, meeting_id } = req.body;
 
-    const parent = await Parent.findOne({ where: { qr_code_uuid: uuid } });
+    const parent = await Parent.findOne({
+      where: { qr_code_uuid: uuid }
+    });
+
     if (!parent) {
       return res.status(404).json({ message: 'Código QR de padre no reconocido' });
+    }
+
+    let student = await Student.findOne({
+      where: { parent_id: parent.id }
+    });
+
+    if (!student) {
+      const studentLink = await StudentParent.findOne({ where: { parent_id: parent.id } });
+      if (studentLink) {
+        student = await Student.findByPk(studentLink.student_id);
+      }
+    }
+
+    if (!student) {
+      return res.status(404).json({ message: 'Estudiante no encontrado para este padre' });
     }
 
     const now = new Date();
@@ -94,6 +114,7 @@ exports.scanParentQR = async (req, res) => {
     res.json({
       message: `Registro de ${type} exitoso para reunión`,
       parent: `${parent.first_name} ${parent.last_name}`,
+      student: `${student.first_name} ${student.last_name}`,
       time: now.toLocaleTimeString()
     });
 

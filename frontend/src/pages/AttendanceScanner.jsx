@@ -14,6 +14,21 @@ const AttendanceScanner = () => {
   const [activeMeetings, setActiveMeetings] = useState([]);
   const [selectedMeeting, setSelectedMeeting] = useState('');
   const lastScanned = useRef({ uuid: null, time: 0 });
+  const scanModeRef = useRef(scanMode);
+  const selectedMeetingRef = useRef(selectedMeeting);
+  const loadingRef = useRef(loading);
+
+  useEffect(() => {
+    scanModeRef.current = scanMode;
+  }, [scanMode]);
+
+  useEffect(() => {
+    selectedMeetingRef.current = selectedMeeting;
+  }, [selectedMeeting]);
+
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
 
   useEffect(() => {
     if (scanMode === 'padres') {
@@ -43,13 +58,12 @@ const AttendanceScanner = () => {
 
     async function onScanSuccess(decodedText) {
       const now = Date.now();
-      // Si escaneamos el mismo código en menos de 5 segundos, lo ignoramos
       if (lastScanned.current.uuid === decodedText && now - lastScanned.current.time < 5000) {
         return;
       }
-      
+
       lastScanned.current = { uuid: decodedText, time: now };
-      handleAttendance(decodedText);
+      handleAttendance(decodedText, scanModeRef.current, selectedMeetingRef.current);
     }
 
     function onScanError(err) {
@@ -61,8 +75,8 @@ const AttendanceScanner = () => {
     };
   }, []);
 
-  const handleAttendance = async (uuid) => {
-    if (loading) return;
+  const handleAttendance = async (uuid, currentMode = scanModeRef.current, currentMeeting = selectedMeetingRef.current) => {
+    if (loadingRef.current) return;
     setLoading(true);
     setError(null);
     setScanResult(null);
@@ -70,13 +84,13 @@ const AttendanceScanner = () => {
 
     try {
       let response;
-      if (scanMode === 'padres') {
-        if (!selectedMeeting) {
+      if (currentMode === 'padres') {
+        if (!currentMeeting) {
           setError('Debe seleccionar una reunión activa primero');
           setLoading(false);
           return;
         }
-        response = await api.post('/meetings/scan', { uuid, meeting_id: selectedMeeting });
+        response = await api.post('/meetings/scan', { uuid, meeting_id: currentMeeting });
       } else {
         response = await api.post('/attendance/scan', { uuid });
       }
