@@ -23,6 +23,10 @@ const Student = sequelize.define('Student', {
   qr_code_uuid: {
     type: DataTypes.STRING,
     unique: true
+  },
+  parent_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true
   }
 });
 

@@ -63,6 +63,7 @@ exports.scanParentQR = async (req, res) => {
   try {
     const { uuid, meeting_id } = req.body;
 
+    // Buscar padre por su QR UUID
     const parent = await Parent.findOne({
       where: { qr_code_uuid: uuid }
     });
@@ -71,19 +72,17 @@ exports.scanParentQR = async (req, res) => {
       return res.status(404).json({ message: 'Código QR de padre no reconocido' });
     }
 
-    let student = await Student.findOne({
-      where: { parent_id: parent.id }
-    });
-
+    // Buscar estudiante vinculado al padre: primero por parent_id directo, luego por tabla intermedia
+    let studentName = null;
+    let student = await Student.findOne({ where: { parent_id: parent.id } });
     if (!student) {
       const studentLink = await StudentParent.findOne({ where: { parent_id: parent.id } });
       if (studentLink) {
         student = await Student.findByPk(studentLink.student_id);
       }
     }
-
-    if (!student) {
-      return res.status(404).json({ message: 'Estudiante no encontrado para este padre' });
+    if (student) {
+      studentName = `${student.first_name} ${student.last_name}`;
     }
 
     const now = new Date();
@@ -114,7 +113,7 @@ exports.scanParentQR = async (req, res) => {
     res.json({
       message: `Registro de ${type} exitoso para reunión`,
       parent: `${parent.first_name} ${parent.last_name}`,
-      student: `${student.first_name} ${student.last_name}`,
+      student: studentName || 'Sin estudiante vinculado',
       time: now.toLocaleTimeString()
     });
 

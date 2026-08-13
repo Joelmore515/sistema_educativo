@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
-import { Calendar, Search, Filter, CheckCircle, XCircle, Clock, AlertTriangle, FileText, Trash2, Pencil } from 'lucide-react';
+import { Calendar, Search, Filter, CheckCircle, XCircle, Clock, AlertTriangle, FileText, Trash2, Pencil, X, ChevronDown } from 'lucide-react';
 
 const AttendancePanel = () => {
   const [attendances, setAttendances] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterDate, setFilterDate] = useState('');
+  const [filterStatus, setFilterStatus] = useState('TODOS');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [activeAction, setActiveAction] = useState(null);
@@ -55,9 +58,53 @@ const AttendancePanel = () => {
     }
   };
 
+  // Obtener la fecha de hoy en formato local YYYY-MM-DD
+  const getTodayLocal = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  };
+
+  const handleFilterToday = () => {
+    const todayStr = getTodayLocal();
+    if (filterDate === todayStr && filterStatus === 'TODOS') {
+      // Si ya está filtrado por hoy, quitar filtro
+      setFilterDate('');
+    } else {
+      setFilterDate(todayStr);
+    }
+  };
+
+  const handleClearFilters = () => {
+    setFilterDate('');
+    setFilterStatus('TODOS');
+    setShowFilters(false);
+  };
+
+  const hasActiveFilters = filterDate !== '' || filterStatus !== 'TODOS';
+
   const filtered = attendances.filter(a => {
+    // Filtro por nombre
     const name = `${a.Student?.first_name || ''} ${a.Student?.last_name || ''}`.toLowerCase();
-    return name.includes(searchTerm.toLowerCase());
+    if (!name.includes(searchTerm.toLowerCase())) return false;
+
+    // Filtro por fecha
+    if (filterDate) {
+      const attDate = a.attendance_date
+        ? (typeof a.attendance_date === 'string' ? a.attendance_date.split('T')[0] : '')
+        : (a.check_in ? new Date(a.check_in).toLocaleDateString('en-CA') : '');
+      if (attDate !== filterDate) return false;
+    }
+
+    // Filtro por estado
+    if (filterStatus !== 'TODOS') {
+      if (filterStatus === 'justificado') {
+        if (!(a.is_absence && a.is_justified)) return false;
+      } else {
+        if (a.status !== filterStatus) return false;
+      }
+    }
+
+    return true;
   });
 
   // Los filtros por campo se calculan en línea según cada `absenceSearchFields`.
@@ -337,12 +384,77 @@ const AttendancePanel = () => {
           Historial de Asistencia
         </h2>
         <div className="flex gap-2 w-full sm:w-auto">
-          <button className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-all">
+          <button
+            onClick={handleFilterToday}
+            className={`flex-1 sm:flex-none flex items-center justify-center px-4 py-2 rounded-xl border transition-all ${
+              filterDate === getTodayLocal()
+                ? 'bg-amber-50 border-amber-300 text-amber-700'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <Calendar size={18} className="mr-2" />
+            {filterDate === getTodayLocal() ? 'Solo Hoy ✓' : 'Filtrar Hoy'}
+          </button>
+          <button
+            onClick={() => setShowFilters(v => !v)}
+            className={`flex-1 sm:flex-none flex items-center justify-center px-4 py-2 rounded-xl border transition-all ${
+              showFilters || hasActiveFilters
+                ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
             <Filter size={18} className="mr-2" />
-            Filtrar Hoy
+            Filtros
+            {hasActiveFilters && <span className="ml-1.5 w-2 h-2 rounded-full bg-indigo-500 inline-block"></span>}
+            <ChevronDown size={16} className={`ml-1 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
           </button>
         </div>
       </div>
+
+      {/* Panel de filtros */}
+      {showFilters && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm animate-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-slate-800 text-sm">Filtros avanzados</h3>
+            <button onClick={() => setShowFilters(false)} className="text-slate-400 hover:text-slate-600">
+              <X size={18} />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">Fecha</label>
+              <input
+                type="date"
+                value={filterDate}
+                onChange={e => setFilterDate(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-amber-400 transition-all text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">Estado</label>
+              <select
+                value={filterStatus}
+                onChange={e => setFilterStatus(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-amber-400 transition-all text-sm bg-white"
+              >
+                <option value="TODOS">Todos los estados</option>
+                <option value="presente">Presente</option>
+                <option value="tardanza">Tardanza</option>
+                <option value="ausente">Ausente</option>
+                <option value="justificado">Justificado</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex gap-3 mt-4 justify-end">
+            <button
+              onClick={handleClearFilters}
+              className="px-4 py-2 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
+            >
+              Limpiar filtros
+            </button>
+          </div>
+        </div>
+      )}
 
       {message.text && (
         <div className={`rounded-2xl border px-4 py-3 text-sm ${message.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
