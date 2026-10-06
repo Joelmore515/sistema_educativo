@@ -1,6 +1,5 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db');
-const Parent = require('./Parent');
 
 const Student = sequelize.define('Student', {
   first_name: {
@@ -24,10 +23,6 @@ const Student = sequelize.define('Student', {
     type: DataTypes.STRING,
     unique: true
   },
-  parent_id: {
-    type: DataTypes.INTEGER,
-    allowNull: true
-  }
 });
 
 module.exports = Student;
