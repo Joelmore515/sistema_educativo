@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
-import { UserPlus, ArrowLeft, Mail, Lock, ShieldCheck, Users } from 'lucide-react';
+import { UserPlus, ArrowLeft, Mail, Lock, ShieldCheck, Users, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 import logoColegio from '../assets/logo_colegio.jpg';
 
 const Register = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [roleName, setRoleName] = useState('padre');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -159,7 +160,7 @@ const Register = () => {
                     type="email"
                     required
                     placeholder="tucorreo@institucion.edu.pe"
-                    className="block w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none shadow-sm hover:border-slate-300"
+                    className="block w-full pl-11! pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none shadow-sm hover:border-slate-300"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={isLoading}
@@ -174,14 +175,28 @@ const Register = () => {
                     <Lock size={20} />
                   </div>
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     required
                     placeholder="••••••••"
-                    className="block w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none shadow-sm hover:border-slate-300"
+                    className="block w-full pl-11! pr-11! py-3.5 bg-white border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none shadow-sm hover:border-slate-300"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={isLoading}
+                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  >
+                    {showPassword ? (
+                      <EyeOff size={20} className="transition-transform active:scale-90" />
+                    ) : (
+                      <Eye size={20} className="transition-transform active:scale-90" />
+                    )}
+                  </button>
                 </div>
               </div>
 
@@ -192,7 +207,7 @@ const Register = () => {
                     <Users size={20} />
                   </div>
                   <select
-                    className="block w-full pl-11 pr-10 py-3.5 bg-white border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none shadow-sm hover:border-slate-300 appearance-none text-slate-700 font-medium"
+                    className="block w-full pl-11! pr-10 py-3.5 bg-white border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none shadow-sm hover:border-slate-300 appearance-none text-slate-700 font-medium"
                     value={roleName}
                     onChange={(e) => setRoleName(e.target.value)}
                     disabled={isLoading}

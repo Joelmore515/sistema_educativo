@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
-import { GraduationCap, Search, QrCode, X, Filter, Loader2, Download, Printer, Pencil, Trash2 } from 'lucide-react';
+import { GraduationCap, Search, QrCode, X, Filter, Loader2, Download, Printer, Pencil, Trash2, Mail, Key } from 'lucide-react';
 
 const createEmptyParent = () => ({
   id: null,
@@ -16,6 +16,8 @@ const createEmptyStudent = () => ({
   last_name: '',
   grade: '',
   section: '',
+  email: '',
+  password: '',
   parents: [createEmptyParent()]
 });
 
@@ -81,6 +83,8 @@ const StudentManagement = () => {
       last_name: student.last_name || '',
       grade: gradeMatch ? gradeMatch[1] : '',
       section: sectionMatch ? sectionMatch[1].toUpperCase() : '',
+      email: student.User?.email || '',
+      password: '',
       parents
     });
     setEditingStudentId(student.id);
@@ -166,7 +170,9 @@ const StudentManagement = () => {
         last_name: newStudent.last_name,
         dni: newStudent.dni,
         grade_section: [newStudent.grade, newStudent.section].filter(Boolean).join(' '),
-        parents: newStudent.parents
+        parents: newStudent.parents,
+        email: newStudent.email ? newStudent.email.trim() : null,
+        password: newStudent.password ? newStudent.password.trim() : null
       };
 
       if (editingStudentId) {
@@ -251,6 +257,13 @@ const StudentManagement = () => {
                       <div className="flex flex-col">
                         <span className="font-bold text-slate-900">{student.first_name} {student.last_name}</span>
                         <span className="text-xs text-slate-500">DNI: {student.dni || 'N/A'}</span>
+                        {student.User?.email ? (
+                          <span className="text-xs text-emerald-600 font-medium flex items-center gap-1 mt-0.5">
+                            <Mail size={12} /> {student.User.email}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-slate-400">Sin acceso web</span>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -355,6 +368,30 @@ const StudentManagement = () => {
                     <label className="block text-sm font-medium text-slate-700 mb-1">Apellidos</label>
                     <input required className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
                       value={newStudent.last_name} onChange={e => setNewStudent({ ...newStudent, last_name: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
+                      <Mail size={14} className="text-emerald-600" /> Correo Institucional / Acceso
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="estudiante@colegio.edu.pe"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                      value={newStudent.email}
+                      onChange={e => setNewStudent({ ...newStudent, email: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
+                      <Key size={14} className="text-emerald-600" /> {editingStudentId ? 'Cambiar Contraseña' : 'Contraseña de Acceso'}
+                    </label>
+                    <input
+                      type="password"
+                      placeholder={editingStudentId ? 'Dejar en blanco para mantener actual' : 'Por defecto DNI si se deja vacío'}
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                      value={newStudent.password}
+                      onChange={e => setNewStudent({ ...newStudent, password: e.target.value })}
+                    />
                   </div>
                 </div>
               </div>

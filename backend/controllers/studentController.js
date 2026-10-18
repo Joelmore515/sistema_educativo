@@ -1,4 +1,5 @@
-const { Student, Parent } = require('../models');
+const { Student, Parent, User, Role } = require('../models');
+const bcrypt = require('bcryptjs');
 const { generateQR } = require('../utils/qrGenerator');
 
 const formatStudentResponse = (student) => ({
@@ -7,7 +8,9 @@ const formatStudentResponse = (student) => ({
   last_name: student.last_name,
   dni: student.dni,
   grade_section: student.grade_section,
-  qr_code_uuid: student.qr_code_uuid
+  qr_code_uuid: student.qr_code_uuid,
+  user_id: student.user_id,
+  User: student.User ? { id: student.User.id, email: student.User.email } : null
 });
 
 const handleParentAssociation = async (student, parentData) => {
@@ -65,7 +68,9 @@ exports.registerStudent = async (req, res) => {
       dni,
       section_id,
       grade_section,
-      parents
+      parents,
+      email,
+      password
     } = req.body;
 
     if (dni) {
@@ -75,6 +80,30 @@ exports.registerStudent = async (req, res) => {
       }
     }
 
+    let userId = null;
+    // Crear cuenta de usuario si se proporciona email
+    if (email) {
+      const existingUser = await User.findOne({ where: { email } });
+      if (existingUser) {
+        return res.status(400).json({ message: 'El correo electrónico ya está registrado para otro usuario' });
+      }
+
+      const role = await Role.findOne({ where: { name: 'estudiante' } });
+      if (!role) {
+        return res.status(500).json({ message: 'Error de configuración: Rol estudiante no encontrado' });
+      }
+
+      const rawPassword = password && password.trim() ? password : (dni || '123456');
+      const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
+      const user = await User.create({
+        email,
+        password: hashedPassword,
+        role_id: role.id
+      });
+      userId = user.id;
+    }
+
     const { uuid } = await generateQR();
 
     const student = await Student.create({
@@ -82,7 +111,8 @@ exports.registerStudent = async (req, res) => {
       last_name,
       dni,
       grade_section: grade_section || section_id || null,
-      qr_code_uuid: uuid
+      qr_code_uuid: uuid,
+      user_id: userId
     });
 
     if (parents && Array.isArray(parents)) {
@@ -91,9 +121,16 @@ exports.registerStudent = async (req, res) => {
       }
     }
 
+    const fullStudent = await Student.findByPk(student.id, {
+      include: [
+        { model: Parent },
+        { model: User, attributes: ['id', 'email', 'role_id'] }
+      ]
+    });
+
     res.status(201).json({
       message: 'Estudiante registrado con éxito',
-      student: formatStudentResponse(student)
+      student: fullStudent || formatStudentResponse(student)
     });
   } catch (error) {
     res.status(500).json({ message: 'Error al registrar estudiante', error: error.message });
@@ -103,7 +140,10 @@ exports.registerStudent = async (req, res) => {
 exports.getAllStudents = async (req, res) => {
   try {
     const students = await Student.findAll({
-      include: [{ model: Parent }],
+      include: [
+        { model: Parent },
+        { model: User, attributes: ['id', 'email', 'role_id'] }
+      ],
       order: [['id', 'ASC']]
     });
     res.json(students);
@@ -121,10 +161,17 @@ exports.updateStudent = async (req, res) => {
       dni,
       section_id,
       grade_section,
-      parents
+      parents,
+      email,
+      password
     } = req.body;
 
-    const student = await Student.findByPk(id, { include: [{ model: Parent }] });
+    const student = await Student.findByPk(id, {
+      include: [
+        { model: Parent },
+        { model: User }
+      ]
+    });
     if (!student) {
       return res.status(404).json({ message: 'Estudiante no encontrado' });
     }
@@ -140,6 +187,42 @@ exports.updateStudent = async (req, res) => {
     student.last_name = last_name ?? student.last_name;
     student.dni = dni ?? student.dni;
     student.grade_section = grade_section ?? section_id ?? student.grade_section;
+
+    // Gestionar cuenta de usuario del estudiante
+    if (email) {
+      if (student.user_id) {
+        const user = await User.findByPk(student.user_id);
+        if (user) {
+          const existingEmailUser = await User.findOne({ where: { email } });
+          if (existingEmailUser && existingEmailUser.id !== user.id) {
+            return res.status(400).json({ message: 'El correo electrónico ya está registrado para otro usuario' });
+          }
+
+          const updates = { email };
+          if (password && password.trim()) {
+            updates.password = await bcrypt.hash(password, 10);
+          }
+          await user.update(updates);
+        }
+      } else {
+        const existingEmailUser = await User.findOne({ where: { email } });
+        if (existingEmailUser) {
+          return res.status(400).json({ message: 'El correo electrónico ya está registrado para otro usuario' });
+        }
+
+        const role = await Role.findOne({ where: { name: 'estudiante' } });
+        const rawPassword = password && password.trim() ? password : (dni || '123456');
+        const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
+        const newUser = await User.create({
+          email,
+          password: hashedPassword,
+          role_id: role.id
+        });
+        student.user_id = newUser.id;
+      }
+    }
+
     await student.save();
 
     if (parents && Array.isArray(parents)) {
@@ -148,7 +231,13 @@ exports.updateStudent = async (req, res) => {
       }
     }
 
-    const updatedStudent = await Student.findByPk(id, { include: [{ model: Parent }] });
+    const updatedStudent = await Student.findByPk(id, {
+      include: [
+        { model: Parent },
+        { model: User, attributes: ['id', 'email', 'role_id'] }
+      ]
+    });
+
     res.json({
       message: 'Estudiante actualizado con éxito',
       student: updatedStudent
@@ -169,6 +258,10 @@ exports.deleteStudent = async (req, res) => {
 
     if (student.Parents && student.Parents.length > 0) {
       await student.removeParents(student.Parents);
+    }
+
+    if (student.user_id) {
+      await User.destroy({ where: { id: student.user_id } });
     }
 
     await student.destroy();

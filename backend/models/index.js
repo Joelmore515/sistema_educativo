@@ -15,6 +15,10 @@ Role.hasMany(User, { foreignKey: 'role_id' });
 Parent.belongsTo(User, { foreignKey: 'user_id' });
 User.hasOne(Parent, { foreignKey: 'user_id' });
 
+// Student & User
+Student.belongsTo(User, { foreignKey: 'user_id' });
+User.hasOne(Student, { foreignKey: 'user_id' });
+
 // Parent & Student (Many to Many)
 Parent.belongsToMany(Student, { through: StudentParent, foreignKey: 'parent_id' });
 Student.belongsToMany(Parent, { through: StudentParent, foreignKey: 'student_id' });

@@ -31,7 +31,7 @@ const Dashboard = () => {
     { title: 'Estudiantes', icon: Users, path: '/dashboard/students', color: 'bg-emerald-500', role: ['admin', 'docente', 'director'] },
     { title: 'Padres o Apoderados', icon: User, path: '/dashboard/parents', color: 'bg-blue-500', role: ['admin', 'director'] },
     { title: 'Reuniones', icon: Calendar, path: '/dashboard/meetings', color: 'bg-violet-500', role: ['admin', 'director'] },
-    { title: 'Asistencia', icon: Calendar, path: '/dashboard/attendance', color: 'bg-amber-500', role: ['admin', 'docente', 'director', 'padre'] },
+    { title: 'Asistencia', icon: Calendar, path: '/dashboard/attendance', color: 'bg-amber-500', role: ['admin', 'docente', 'director', 'padre', 'estudiante'] },
     { title: 'Reportes', icon: BarChart3, path: '/dashboard/reports', color: 'bg-fuchsia-500', role: ['admin', 'director'] },
   ];
 
