@@ -23,10 +23,6 @@ const Student = sequelize.define('Student', {
     type: DataTypes.STRING,
     unique: true
   },
-  user_id: {
-    type: DataTypes.INTEGER,
-    allowNull: true
-  }
 });
 
 module.exports = Student;
