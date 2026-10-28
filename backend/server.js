@@ -1,21 +1,41 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const sequelize = require('./config/db');
+const { apiLimiter } = require('./middlewares/rateLimiters');
 
 const app = express();
 
 // Inicializar modelos y asociaciones
 require('./models');
 
-// Configuración CORS
+app.set('trust proxy', 1);
+
+// Configuración CORS por variable de entorno
+const defaultOrigins = [
+  'https://www.controlasistencia.pro',
+  'https://controlasistencia.pro',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173'
+];
+const configuredOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const allowedOrigins = configuredOrigins.length > 0 ? configuredOrigins : defaultOrigins;
+
 const corsOptions = {
-  origin: [
-    'https://www.controlasistencia.pro',
-    'https://controlasistencia.pro'
-  ],
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    const error = new Error('Origen no permitido por CORS');
+    error.status = 403;
+    return callback(error);
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -23,8 +43,11 @@ const corsOptions = {
 
 // Middlewares - CORS debe ir primero que todo
 app.use(cors(corsOptions));
-
-app.use(express.json());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
+app.use(express.json({ limit: '1mb' }));
+app.use('/api', apiLimiter);
 
 // Inicialización de base de datos
 let dbInitialized = false;
@@ -52,37 +75,28 @@ async function initializeDatabase() {
         });
       }
 
-      // Migración segura: asegurar que students tenga columna user_id
-      try {
-        const queryInterface = sequelize.getQueryInterface();
-        const tableDesc = await queryInterface.describeTable('students').catch(() => null);
-        if (tableDesc && !tableDesc.user_id) {
-          await queryInterface.addColumn('students', 'user_id', {
-            type: sequelize.Sequelize.INTEGER,
-            allowNull: true
-          });
-          console.log('[MIGRATION] Columna user_id añadida a la tabla students');
-        }
-      } catch (migErr) {
-        console.log('[MIGRATION] Verificación students.user_id:', migErr.message);
-      }
-
-      // Seeder automático del primer Administrador (si no existe ninguno)
+      // Seeder del Administrador inicial (solo con variables de entorno)
       const adminRole = await Role.findOne({ where: { name: 'admin' } });
-      if (adminRole) {
-        const adminCount = await User.count({ where: { role_id: adminRole.id } });
-        if (adminCount === 0) {
-          const defaultEmail = process.env.ADMIN_DEFAULT_EMAIL || 'admin@colegio.edu.pe';
-          const defaultPassword = process.env.ADMIN_DEFAULT_PASSWORD || 'AdminColegio2026!';
-          const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+      const defaultEmail = process.env.ADMIN_DEFAULT_EMAIL;
+      const defaultPassword = process.env.ADMIN_DEFAULT_PASSWORD;
 
-          await User.create({
-            email: defaultEmail,
-            password: hashedPassword,
-            role_id: adminRole.id
-          });
-          console.log(`[BOOTSTRAP] Primer Administrador creado exitosamente: ${defaultEmail}`);
+      if (adminRole && defaultEmail && defaultPassword) {
+        try {
+          const existingAdmin = await User.findOne({ where: { email: defaultEmail } });
+          if (!existingAdmin) {
+            const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+            await User.create({
+              email: defaultEmail,
+              password: hashedPassword,
+              role_id: adminRole.id
+            });
+            console.log('[BOOTSTRAP] Administrador inicial creado');
+          }
+        } catch (seedErr) {
+          console.error('[BOOTSTRAP] Error creando admin:', seedErr.message);
         }
+      } else {
+        console.log('[BOOTSTRAP] ADMIN_DEFAULT_EMAIL/PASSWORD no definidos, se omite la creación del admin');
       }
 
       dbInitialized = true;
@@ -104,11 +118,14 @@ app.use(async (req, res, next) => {
     console.error('Error al conectar con la base de datos:', error);
 
     res.status(500).json({
-      error: 'Error de conexión con la base de datos',
-      details: error.message
+      error: 'Error de conexión con la base de datos'
     });
   }
 });
+
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.trim().length < 16) {
+  console.error('[SECURITY] JWT_SECRET no está configurado o es demasiado corto. La API rechazará autenticaciones.');
+}
 
 // Rutas
 app.use('/api/auth', require('./routes/authRoutes'));
@@ -126,6 +143,37 @@ app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.get('/', (req, res) => {
   res.send('API del Sistema de Asistencia Escolar funcionando');
 });
+
+// 404 JSON para rutas no encontradas
+app.use((req, res) => {
+  res.status(404).json({ message: 'Ruta no encontrada' });
+});
+
+// Manejo global de errores
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ message: 'El cuerpo de la petición no es un JSON válido' });
+  }
+
+  if (err.status === 403 || err.message === 'Origen no permitido por CORS') {
+    return res.status(403).json({ message: 'Origen no permitido' });
+  }
+
+  console.error('[ERROR]', err);
+  res.status(err.status || 500).json({
+    message: process.env.NODE_ENV === 'production'
+      ? 'Error interno del servidor'
+      : err.message || 'Error interno del servidor'
+  });
+});
+
+// Levantar servidor local si se ejecuta directamente con node o npm start
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Servidor backend ejecutándose en http://localhost:${PORT}`);
+  });
+}
 
 // Exportar para Vercel
 module.exports = app;

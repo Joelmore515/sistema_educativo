@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const reportController = require('../controllers/reportController');
+const { verifyToken, requireRole } = require('../middlewares/authMiddleware');
+
+router.use(verifyToken, requireRole('admin', 'director', 'docente'));
 
 // Estadísticas generales + resumen del día (acepta ?date=YYYY-MM-DD&grade=X)
 router.get('/general', reportController.getGeneralStats);

@@ -35,21 +35,25 @@ const MeetingAttendancePanel = () => {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchAttendance();
-  }, [id]);
+    let active = true;
+    api.get(`/meetings/${id}/attendance`)
+      .then((response) => {
+        if (!active) return;
+        setAttendance(response.data);
+      })
+      .catch((error) => {
+        if (!active) return;
+        console.error('Error al obtener asistencia:', error);
+        setMessage({ type: 'error', text: 'Error al cargar la lista de asistencia' });
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
-  const fetchAttendance = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get(`/meetings/${id}/attendance`);
-      setAttendance(response.data);
-    } catch (error) {
-      console.error('Error al obtener asistencia:', error);
-      setMessage({ type: 'error', text: 'Error al cargar la lista de asistencia' });
-    } finally {
-      setLoading(false);
-    }
-  };
+    return () => {
+      active = false;
+    };
+  }, [id]);
 
   const handleMarkPresent = async (parent) => {
     try {
@@ -73,7 +77,7 @@ const MeetingAttendancePanel = () => {
         return a;
       }));
       setMessage({ type: 'success', text: `Asistencia registrada para ${parent.first_name}` });
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Error al registrar asistencia manual' });
     } finally {
       setSubmitting(false);
@@ -99,7 +103,7 @@ const MeetingAttendancePanel = () => {
         return a;
       }));
       setMessage({ type: 'success', text: 'Asistencia anulada correctamente' });
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Error al anular asistencia' });
     }
   };
@@ -154,7 +158,7 @@ const MeetingAttendancePanel = () => {
       
       setMessage({ type: 'success', text: 'Horarios actualizados correctamente' });
       setShowEditModal(false);
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Error al actualizar horarios' });
     } finally {
       setSubmitting(false);

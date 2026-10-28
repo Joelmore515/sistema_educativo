@@ -4,12 +4,22 @@ const Parent = require('./Parent');
 const Student = require('./Student');
 const StudentParent = require('./StudentParent');
 const Attendance = require('./Attendance');
+const PasswordResetToken = require('./PasswordResetToken');
+const AuditLog = require('./AuditLog');
 
 // Define associations here to avoid circular dependencies
 
 // User & Role
 User.belongsTo(Role, { foreignKey: 'role_id' });
 Role.hasMany(User, { foreignKey: 'role_id' });
+
+// Password reset tokens
+User.hasMany(PasswordResetToken, { foreignKey: 'user_id' });
+PasswordResetToken.belongsTo(User, { foreignKey: 'user_id' });
+
+// Audit logs
+User.hasMany(AuditLog, { foreignKey: 'user_id' });
+AuditLog.belongsTo(User, { foreignKey: 'user_id' });
 
 // Parent & User
 Parent.belongsTo(User, { foreignKey: 'user_id' });
@@ -29,5 +39,7 @@ module.exports = {
   Parent,
   Student,
   StudentParent,
-  Attendance
+  Attendance,
+  PasswordResetToken,
+  AuditLog
 };

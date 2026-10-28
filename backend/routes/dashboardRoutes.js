@@ -3,6 +3,9 @@ const router = express.Router();
 const { Op } = require('sequelize');
 const { Student, Attendance } = require('../models');
 const Meeting = require('../models/Meeting');
+const { verifyToken, requireRole } = require('../middlewares/authMiddleware');
+
+router.use(verifyToken, requireRole('admin', 'director', 'docente'));
 
 const getLatestAttendanceByStudentAndDate = (records = []) => {
   const latestByKey = new Map();

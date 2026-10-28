@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
-import { UserPlus, Search, Phone, Mail, QrCode, X, Loader2, Download, Printer, Edit2, Trash2 } from 'lucide-react';
+import QrModal from '../components/QrModal';
+import { UserPlus, Search, Phone, Mail, QrCode, X, Loader2, Edit2, Trash2 } from 'lucide-react';
 
 const ParentManagement = () => {
   const [parents, setParents] = useState([]);
@@ -25,10 +26,6 @@ const ParentManagement = () => {
 
   const [loadingDni, setLoadingDni] = useState(false);
 
-  useEffect(() => {
-    fetchParents();
-  }, []);
-
   const fetchParents = async () => {
     try {
       const response = await api.get('/parents');
@@ -39,6 +36,24 @@ const ParentManagement = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    let active = true;
+    api.get('/parents')
+      .then((response) => {
+        if (active) setParents(response.data);
+      })
+      .catch((error) => {
+        console.error('Error al obtener padres:', error);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleDniLookup = async (dni) => {
     if (dni.length !== 8) return;
@@ -262,50 +277,13 @@ const ParentManagement = () => {
         </div>
       )}
 
-      {/* Modal QR Viewer */}
-      {qrModal.show && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl animate-in zoom-in duration-300 overflow-hidden flex flex-col items-center p-8 relative">
-            <button onClick={() => setQrModal({ show: false, uuid: null, name: '' })} className="absolute top-4 right-4 p-2 hover:bg-slate-100 rounded-full transition-all text-slate-500">
-              <X size={20} />
-            </button>
-            <h3 className="text-lg font-bold text-slate-900 mb-1 text-center mt-2">Código QR</h3>
-            <p className="text-sm text-slate-500 mb-6 text-center">{qrModal.name}</p>
-            
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-8 flex justify-center w-full">
-              <img 
-                src={`${api.defaults.baseURL}/qr/${qrModal.uuid}`} 
-                alt={`QR ${qrModal.name}`} 
-                className="w-48 h-48 object-contain"
-              />
-            </div>
-
-            <div className="flex flex-col sm:flex-row w-full gap-3">
-              <a 
-                href={`${api.defaults.baseURL}/qr/${qrModal.uuid}`} 
-                download={`QR_${qrModal.name.replace(/\s+/g, '_')}.png`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex-1 flex justify-center items-center py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200"
-              >
-                <Download size={18} className="mr-2" />
-                Descargar
-              </a>
-              <button 
-                type="button"
-                onClick={() => {
-                  const printWindow = window.open(`${api.defaults.baseURL}/qr/${qrModal.uuid}`);
-                  printWindow.onload = () => printWindow.print();
-                }}
-                className="flex justify-center items-center gap-2 p-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200"
-              >
-                <Printer size={18} />
-                Imprimir
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <QrModal
+        show={qrModal.show}
+        onClose={() => setQrModal({ show: false, uuid: null, name: '' })}
+        uuid={qrModal.uuid}
+        name={qrModal.name}
+        accent="blue"
+      />
     </div>
   );
 };

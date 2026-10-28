@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
-import { GraduationCap, Search, QrCode, X, Filter, Loader2, Download, Printer, Pencil, Trash2, Mail, Key } from 'lucide-react';
+import { useAuth } from '../context/authContextValue';
+import QrModal from '../components/QrModal';
+import { GraduationCap, Search, QrCode, X, Filter, Loader2, Pencil, Trash2, Mail, Key } from 'lucide-react';
 
 const createEmptyParent = () => ({
   id: null,
@@ -22,6 +24,8 @@ const createEmptyStudent = () => ({
 });
 
 const StudentManagement = () => {
+  const { user } = useAuth();
+  const canWrite = ['admin', 'director'].includes(user?.role);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,10 +41,6 @@ const StudentManagement = () => {
   const [loadingStudentDni, setLoadingStudentDni] = useState(false);
   const [loadingParentDni, setLoadingParentDni] = useState({});
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -52,6 +52,24 @@ const StudentManagement = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    let active = true;
+    api.get('/students')
+      .then((response) => {
+        if (active) setStudents(response.data);
+      })
+      .catch((error) => {
+        console.error('Error al cargar datos:', error);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const resetStudentForm = () => {
     setNewStudent(createEmptyStudent());
@@ -206,13 +224,19 @@ const StudentManagement = () => {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
         <h2 className="text-2xl font-bold text-slate-900">Gestión de Estudiantes</h2>
-        <button
-          onClick={openCreateModal}
-          className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
-        >
-          <GraduationCap size={20} className="mr-2" />
-          Nuevo Estudiante
-        </button>
+        {canWrite ? (
+          <button
+            onClick={openCreateModal}
+            className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
+          >
+            <GraduationCap size={20} className="mr-2" />
+            Nuevo Estudiante
+          </button>
+        ) : (
+          <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-500">
+            Modo solo lectura
+          </span>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
@@ -288,22 +312,26 @@ const StudentManagement = () => {
                     </button>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => openEditModal(student)}
-                        className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-all"
-                        title="Editar estudiante"
-                      >
-                        <Pencil size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteStudent(student.id)}
-                        className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all"
-                        title="Eliminar estudiante"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
+                    {canWrite ? (
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => openEditModal(student)}
+                          className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-all"
+                          title="Editar estudiante"
+                        >
+                          <Pencil size={18} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteStudent(student.id)}
+                          className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all"
+                          title="Eliminar estudiante"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs font-medium text-slate-400">Solo lectura</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -452,47 +480,13 @@ const StudentManagement = () => {
         </div>
       )}
 
-      {qrModal.show && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl animate-in zoom-in duration-300 overflow-hidden flex flex-col items-center p-8 relative">
-            <button onClick={() => setQrModal({ show: false, uuid: null, name: '' })} className="absolute top-4 right-4 p-2 hover:bg-slate-100 rounded-full transition-all text-slate-500">
-              <X size={20} />
-            </button>
-            <h3 className="text-lg font-bold text-slate-900 mb-1 text-center mt-2">Código QR</h3>
-            <p className="text-sm text-slate-500 mb-6 text-center">{qrModal.name}</p>
-
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-8 flex justify-center w-full">
-              <img
-                src={`${api.defaults.baseURL}/qr/${qrModal.uuid}`}
-                alt={`QR ${qrModal.name}`}
-                className="w-48 h-48 object-contain"
-              />
-            </div>
-
-            <div className="flex flex-col sm:flex-row w-full gap-3">
-              <a
-                href={`${api.defaults.baseURL}/qr/${qrModal.uuid}`}
-                download={`QR_${qrModal.name.replace(/\s+/g, '_')}.png`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex-1 flex justify-center items-center py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
-              >
-                <Download size={18} className="mr-2" />
-                Descargar
-              </a>
-              <button
-                onClick={() => {
-                  const printWindow = window.open(`${api.defaults.baseURL}/qr/${qrModal.uuid}`);
-                  printWindow.onload = () => printWindow.print();
-                }}
-                className="flex justify-center items-center p-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-all"
-              >
-                <Printer size={18} />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <QrModal
+        show={qrModal.show}
+        onClose={() => setQrModal({ show: false, uuid: null, name: '' })}
+        uuid={qrModal.uuid}
+        name={qrModal.name}
+        accent="emerald"
+      />
     </div>
   );
 };

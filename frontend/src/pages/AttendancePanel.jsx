@@ -1,8 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../services/api';
+import { useAuth } from '../context/authContextValue';
 import { Calendar, Search, Filter, CheckCircle, XCircle, Clock, AlertTriangle, FileText, Trash2, Pencil, X, ChevronDown } from 'lucide-react';
 
 const AttendancePanel = () => {
+  const { user } = useAuth();
+  const canManage = ['admin', 'director', 'docente'].includes(user?.role);
   const [attendances, setAttendances] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,9 +26,8 @@ const AttendancePanel = () => {
     justification_reason: ''
   });
   // ahora manejamos múltiples campos de búsqueda para agregar varios estudiantes
-  const [absenceSearchFields, setAbsenceSearchFields] = useState([{ id: Date.now(), value: '', selectedId: null }]);
+  const [absenceSearchFields, setAbsenceSearchFields] = useState([{ id: 0, value: '', selectedId: null }]);
   const [justificationSearch, setJustificationSearch] = useState('');
-  const justificationInputRef = useRef(null);
   const [absenceForm, setAbsenceForm] = useState({
     student_ids: [],
     date: '',
@@ -39,24 +41,28 @@ const AttendancePanel = () => {
   });
 
   useEffect(() => {
-    fetchData();
+    let active = true;
+    Promise.all([
+      api.get('/attendance'),
+      api.get('/students')
+    ])
+      .then(([attendanceResponse, studentsResponse]) => {
+        if (!active) return;
+        setAttendances(attendanceResponse.data);
+        setStudents(studentsResponse.data);
+      })
+      .catch((error) => {
+        if (!active) return;
+        console.error('Error al obtener asistencias:', error);
+        setMessage({ type: 'error', text: 'No se pudo cargar la información' });
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
-
-  const fetchData = async () => {
-    try {
-      const [attendanceResponse, studentsResponse] = await Promise.all([
-        api.get('/attendance'),
-        api.get('/students')
-      ]);
-      setAttendances(attendanceResponse.data);
-      setStudents(studentsResponse.data);
-    } catch (error) {
-      console.error('Error al obtener asistencias:', error);
-      setMessage({ type: 'error', text: 'No se pudo cargar la información' });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Obtener la fecha de hoy en formato local YYYY-MM-DD
   const getTodayLocal = () => {
@@ -161,7 +167,7 @@ const AttendancePanel = () => {
 
   const addJustificationField = () => {
     setJustificationSearch('');
-    justificationInputRef.current?.focus();
+    document.getElementById('justification-search')?.focus();
   };
 
   const updateJustificationSearch = (value) => {
@@ -180,7 +186,7 @@ const AttendancePanel = () => {
       student_ids: [...prev.student_ids, studentIdStr]
     }));
     setJustificationSearch('');
-    justificationInputRef.current?.focus();
+    document.getElementById('justification-search')?.focus();
   };
 
   const removeJustificationStudent = (studentId) => {
@@ -189,22 +195,6 @@ const AttendancePanel = () => {
       ...prev,
       student_ids: prev.student_ids.filter(id => id !== normalizedId)
     }));
-  };
-
-  const removeAbsenceField = (fieldId) => {
-    setAbsenceSearchFields(prev => {
-      const target = prev.find(f => f.id === fieldId);
-      const sel = target?.selectedId;
-      const next = prev.length === 1 ? [{ id: Date.now(), value: '', selectedId: null }] : prev.filter(f => f.id !== fieldId);
-
-      // actualizar selections
-      setAbsenceForm(prevForm => {
-        if (!sel) return prevForm;
-        return { ...prevForm, student_ids: prevForm.student_ids.filter(id => id !== sel) };
-      });
-
-      return next;
-    });
   };
 
   const parseLocalDateValue = (value) => {
@@ -242,6 +232,10 @@ const AttendancePanel = () => {
   };
 
   const startEditAttendance = (attendance) => {
+    if (!canManage) {
+      setMessage({ type: 'error', text: 'No tienes permisos para editar asistencias' });
+      return;
+    }
     setEditingAttendance(attendance);
     setEditForm({
       date: formatLocalDate(attendance.attendance_date || attendance.check_in),
@@ -267,7 +261,7 @@ const AttendancePanel = () => {
 
   const handleUpdateAttendance = async (e) => {
     e.preventDefault();
-    if (!editingAttendance) return;
+    if (!editingAttendance || !canManage) return;
 
     setSubmitting(true);
     setMessage({ type: '', text: '' });
@@ -299,6 +293,10 @@ const AttendancePanel = () => {
   };
 
   const handleDeleteAttendance = async (attendanceId) => {
+    if (!canManage) {
+      setMessage({ type: 'error', text: 'No tienes permisos para eliminar asistencias' });
+      return;
+    }
     const confirmed = window.confirm('¿Estás seguro de que deseas eliminar este registro de asistencia?');
     if (!confirmed) return;
 
@@ -313,6 +311,10 @@ const AttendancePanel = () => {
 
   const handleRegisterAbsence = async (e) => {
     e.preventDefault();
+    if (!canManage) {
+      setMessage({ type: 'error', text: 'No tienes permisos para registrar faltas' });
+      return;
+    }
     if (!absenceForm.student_ids.length) {
       setMessage({ type: 'error', text: 'Debe seleccionar al menos un estudiante' });
       return;
@@ -343,7 +345,11 @@ const AttendancePanel = () => {
 
   const handleJustifyAbsence = async (e) => {
     e.preventDefault();
-    
+
+    if (!canManage) {
+      setMessage({ type: 'error', text: 'No tienes permisos para justificar faltas' });
+      return;
+    }
     if (!justifyForm.student_ids.length) {
       setMessage({ type: 'error', text: 'Debe seleccionar al menos un estudiante' });
       return;
@@ -463,28 +469,34 @@ const AttendancePanel = () => {
       )}
 
       <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveAction('absence')}
-            className={`rounded-xl px-3 py-2 text-sm font-semibold transition-all ${activeAction === 'absence' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-          >
-            <span className="flex items-center">
-              <AlertTriangle className="mr-2" size={16} />
-              Registrar Falta
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveAction('justification')}
-            className={`rounded-xl px-3 py-2 text-sm font-semibold transition-all ${activeAction === 'justification' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-          >
-            <span className="flex items-center">
-              <FileText className="mr-2" size={16} />
-              Registrar Justificación
-            </span>
-          </button>
-        </div>
+        {canManage ? (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveAction('absence')}
+              className={`rounded-xl px-3 py-2 text-sm font-semibold transition-all ${activeAction === 'absence' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+            >
+              <span className="flex items-center">
+                <AlertTriangle className="mr-2" size={16} />
+                Registrar Falta
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveAction('justification')}
+              className={`rounded-xl px-3 py-2 text-sm font-semibold transition-all ${activeAction === 'justification' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+            >
+              <span className="flex items-center">
+                <FileText className="mr-2" size={16} />
+                Registrar Justificación
+              </span>
+            </button>
+          </div>
+        ) : (
+          <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-500">
+            Modo solo lectura
+          </span>
+        )}
 
         {(activeAction || editingAttendance) && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
@@ -688,7 +700,7 @@ const AttendancePanel = () => {
                     </div>
                     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-2">
                       <input
-                        ref={justificationInputRef}
+                        id="justification-search"
                         type="text"
                         value={justificationSearch}
                         onChange={(e) => updateJustificationSearch(e.target.value)}
@@ -800,14 +812,16 @@ const AttendancePanel = () => {
                 <th className="px-6 py-4 text-sm font-bold text-slate-600 uppercase">Ingreso</th>
                 <th className="px-6 py-4 text-sm font-bold text-slate-600 uppercase">Salida</th>
                 <th className="px-6 py-4 text-sm font-bold text-slate-600 uppercase">Estado</th>
-                <th className="px-6 py-4 text-sm font-bold text-slate-600 uppercase">Acciones</th>
+                {canManage && (
+                  <th className="px-6 py-4 text-sm font-bold text-slate-600 uppercase">Acciones</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                <tr><td colSpan="6" className="px-6 py-10 text-center text-slate-400">Cargando...</td></tr>
+                <tr><td colSpan={canManage ? 6 : 5} className="px-6 py-10 text-center text-slate-400">Cargando...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan="6" className="px-6 py-10 text-center text-slate-400">No hay registros de asistencia.</td></tr>
+                <tr><td colSpan={canManage ? 6 : 5} className="px-6 py-10 text-center text-slate-400">No hay registros de asistencia.</td></tr>
               ) : filtered.map(att => (
                 <tr key={att.id} className="hover:bg-slate-50/50 transition-all">
                   <td className="px-6 py-4 font-bold text-slate-900">
@@ -850,24 +864,26 @@ const AttendancePanel = () => {
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => startEditAttendance(att)}
-                        className="rounded-full bg-slate-100 p-2 text-slate-700 hover:bg-slate-200"
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteAttendance(att.id)}
-                        className="rounded-full bg-slate-100 p-2 text-red-600 hover:bg-red-100"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
+                  {canManage && (
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => startEditAttendance(att)}
+                          className="rounded-full bg-slate-100 p-2 text-slate-700 hover:bg-slate-200"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAttendance(att.id)}
+                          className="rounded-full bg-slate-100 p-2 text-red-600 hover:bg-red-100"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

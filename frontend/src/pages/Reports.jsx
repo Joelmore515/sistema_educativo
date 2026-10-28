@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import { Download, Filter, TrendingUp, Users, CheckCircle, Clock, AlertTriangle, X, ChevronDown } from 'lucide-react';
 
 // ─── Utilidad: exportar PDF con jsPDF si está disponible, si no usa window.print ───
@@ -179,33 +179,38 @@ const Reports = () => {
   const [filterGrade, setFilterGrade] = useState('TODOS');
 
   const fetchStats = useCallback(async (date, grade) => {
-    setLoading(true);
-    try {
-      const params = {};
-      if (date) params.date = date;
-      if (grade && grade !== 'TODOS') params.grade = grade;
-      const response = await api.get('/reports/general', { params });
-      setStats(response.data);
-    } catch (error) {
-      console.error('Error al obtener estadísticas:', error);
-    } finally {
-      setLoading(false);
-    }
+    const params = {};
+    if (date) params.date = date;
+    if (grade && grade !== 'TODOS') params.grade = grade;
+    const response = await api.get('/reports/general', { params });
+    return response.data;
   }, []);
 
   useEffect(() => {
-    fetchStats(filterDate, filterGrade);
-  }, []); // Solo al montar
+    let active = true;
+    fetchStats(filterDate, filterGrade)
+      .then((data) => {
+        if (!active) return;
+        setStats(data);
+        setLoading(false);
+      })
+      .catch((error) => {
+        if (!active) return;
+        console.error('Error al obtener estadísticas:', error);
+        setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [fetchStats, filterDate, filterGrade]);
 
   const handleApplyFilters = () => {
-    fetchStats(filterDate, filterGrade);
     setShowFilters(false);
   };
 
   const handleResetFilters = () => {
     setFilterDate(todayISO);
     setFilterGrade('TODOS');
-    fetchStats(todayISO, 'TODOS');
     setShowFilters(false);
   };
 

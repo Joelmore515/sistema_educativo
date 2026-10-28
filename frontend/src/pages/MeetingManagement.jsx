@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
-import { Calendar, Search, Plus, X, Loader2, Users, Edit2, Trash2, ClipboardList } from 'lucide-react';
+import { Calendar, Search, Plus, X, Loader2, Edit2, Trash2, ClipboardList } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const MeetingManagement = () => {
@@ -38,21 +38,25 @@ const MeetingManagement = () => {
   };
 
   useEffect(() => {
-    fetchMeetings();
-  }, []);
+    let active = true;
+    api.get('/meetings')
+      .then((response) => {
+        if (!active) return;
+        setMeetings(response.data);
+      })
+      .catch((error) => {
+        if (!active) return;
+        console.error('Error al obtener reuniones:', error);
+        setMessage({ type: 'error', text: 'Error al cargar las reuniones' });
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
-  const fetchMeetings = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('/meetings');
-      setMeetings(response.data);
-    } catch (error) {
-      console.error('Error al obtener reuniones:', error);
-      setMessage({ type: 'error', text: 'Error al cargar las reuniones' });
-    } finally {
-      setLoading(false);
-    }
-  };
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -97,7 +101,7 @@ const MeetingManagement = () => {
         await api.delete(`/meetings/${id}`);
         setMeetings(meetings.filter(m => m.id !== id));
         setMessage({ type: 'success', text: 'Reunión eliminada exitosamente' });
-      } catch (error) {
+      } catch {
         setMessage({ type: 'error', text: 'Error al eliminar la reunión' });
       }
     }

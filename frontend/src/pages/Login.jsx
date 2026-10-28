@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/authContextValue';
+import { Link, useNavigate } from 'react-router-dom';
 import { LogIn, Mail, Lock, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 import logoColegio from '../assets/logo_colegio.jpg';
@@ -22,7 +22,15 @@ const Login = () => {
       await login(email, password);
       navigate('/dashboard');
     } catch (err) {
-      setError('Credenciales incorrectas o error en el servidor');
+      const serverMessage =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.response?.data?.details ||
+        (err.response?.status === 405 ? 'Error 405: Método no permitido (Verifica la URL del backend en producción)' : null) ||
+        (err.response?.status === 404 ? 'Error 404: Endpoint no encontrado' : null) ||
+        err.message ||
+        'Credenciales incorrectas o error en el servidor';
+      setError(serverMessage);
       setIsLoading(false);
     }
   };
@@ -147,6 +155,12 @@ const Login = () => {
               <div>
                 <div className="flex justify-between items-center mb-2">
                    <label className="block text-sm font-bold text-slate-700">Contraseña</label>
+                   <Link
+                     to="/forgot-password"
+                     className="text-sm font-semibold text-primary-600 hover:text-primary-700"
+                   >
+                     ¿Olvidaste tu contraseña?
+                   </Link>
                 </div>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-primary-500 transition-colors">

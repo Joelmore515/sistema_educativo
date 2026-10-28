@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/authContextValue';
 import api from '../services/api';
 import {
   LogOut,
@@ -14,8 +14,10 @@ import {
   Sparkles,
   ShieldCheck,
   Loader2,
+  Home,
 } from 'lucide-react';
 import { Link, Routes, Route } from 'react-router-dom';
+import { RoleRoute } from '../components/RouteGuards';
 import StudentManagement from './StudentManagement';
 import ParentManagement from './ParentManagement';
 import AttendancePanel from './AttendancePanel';
@@ -23,21 +25,46 @@ import Reports from './Reports';
 import MeetingManagement from './MeetingManagement';
 import MeetingAttendancePanel from './MeetingAttendancePanel';
 
+const FamilyHome = ({ user }) => (
+  <section className="welcome-panel">
+    <div className="welcome-copy">
+      <div className="inline-flex items-center gap-2 badge-soft">
+        <ShieldCheck size={14} />
+        Portal familiar
+      </div>
+      <h3>Bienvenido, {user?.email?.split('@')[0] || 'familia'}.</h3>
+      <p>
+        Tu cuenta está activa. Próximamente podrás consultar aquí la asistencia, reuniones y
+        el carnet QR de tus hijos. Si necesitas información urgente, contacta al colegio.
+      </p>
+    </div>
+    <div className="mini-stats">
+      <div className="mini-stat">
+        <span>Cuenta</span>
+        <strong className="capitalize">{user?.role}</strong>
+      </div>
+    </div>
+  </section>
+);
+
 const Dashboard = () => {
   const { user, logout } = useAuth();
+  const canViewStats = ['admin', 'director', 'docente'].includes(user?.role);
+  const isFamilyRole = ['padre', 'estudiante'].includes(user?.role);
 
   const menuItems = [
+    { title: 'Inicio', icon: Home, path: '/dashboard', color: 'bg-slate-500', role: ['admin', 'docente', 'director', 'padre', 'estudiante'] },
     { title: 'Escáner QR', icon: QrCode, path: '/scanner', color: 'bg-sky-500', role: ['admin', 'docente', 'director'] },
     { title: 'Estudiantes', icon: Users, path: '/dashboard/students', color: 'bg-emerald-500', role: ['admin', 'docente', 'director'] },
     { title: 'Padres o Apoderados', icon: User, path: '/dashboard/parents', color: 'bg-blue-500', role: ['admin', 'director'] },
     { title: 'Reuniones', icon: Calendar, path: '/dashboard/meetings', color: 'bg-violet-500', role: ['admin', 'director'] },
-    { title: 'Asistencia', icon: Calendar, path: '/dashboard/attendance', color: 'bg-amber-500', role: ['admin', 'docente', 'director', 'padre', 'estudiante'] },
-    { title: 'Reportes', icon: BarChart3, path: '/dashboard/reports', color: 'bg-fuchsia-500', role: ['admin', 'director'] },
+    { title: 'Asistencia', icon: Calendar, path: '/dashboard/attendance', color: 'bg-amber-500', role: ['admin', 'docente', 'director'] },
+    { title: 'Reportes', icon: BarChart3, path: '/dashboard/reports', color: 'bg-fuchsia-500', role: ['admin', 'director', 'docente'] },
   ];
 
   const filteredMenu = menuItems.filter(item => item.role.includes(user?.role));
 
-  const [loadingStats, setLoadingStats] = useState(true);
+  const [loadingStats, setLoadingStats] = useState(canViewStats);
   const [statsData, setStatsData] = useState({
     totalStudents: 0,
     attendancePercentage: 0,
@@ -50,6 +77,10 @@ const Dashboard = () => {
   const [targetBars, setTargetBars] = useState([0, 0, 0, 0, 0, 0]);
 
   useEffect(() => {
+    if (!canViewStats) {
+      return;
+    }
+
     const fetchDashboardStats = async () => {
       try {
         setLoadingStats(true);
@@ -67,7 +98,7 @@ const Dashboard = () => {
     };
 
     fetchDashboardStats();
-  }, []);
+  }, [canViewStats]);
 
   useEffect(() => {
     if (!loadingStats) {
@@ -159,7 +190,10 @@ const Dashboard = () => {
           <Route
             index
             element={
-              <>
+              isFamilyRole ? (
+                <FamilyHome user={user} />
+              ) : (
+                <>
                 <section className="welcome-panel">
                   <div className="welcome-copy">
                     <div className="inline-flex items-center gap-2 badge-soft">
@@ -290,15 +324,58 @@ const Dashboard = () => {
                     ))}
                   </div>
                 </section>
-              </>
+                </>
+              )
             }
           />
-          <Route path="students" element={<StudentManagement />} />
-          <Route path="parents" element={<ParentManagement />} />
-          <Route path="meetings" element={<MeetingManagement />} />
-          <Route path="meetings/:id/attendance" element={<MeetingAttendancePanel />} />
-          <Route path="attendance" element={<AttendancePanel />} />
-          <Route path="reports" element={<Reports />} />
+          <Route
+            path="students"
+            element={
+              <RoleRoute roles={['admin', 'director', 'docente']}>
+                <StudentManagement />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="parents"
+            element={
+              <RoleRoute roles={['admin', 'director']}>
+                <ParentManagement />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="meetings"
+            element={
+              <RoleRoute roles={['admin', 'director']}>
+                <MeetingManagement />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="meetings/:id/attendance"
+            element={
+              <RoleRoute roles={['admin', 'director']}>
+                <MeetingAttendancePanel />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="attendance"
+            element={
+              <RoleRoute roles={['admin', 'director', 'docente']}>
+                <AttendancePanel />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="reports"
+            element={
+              <RoleRoute roles={['admin', 'director', 'docente']}>
+                <Reports />
+              </RoleRoute>
+            }
+          />
         </Routes>
       </main>
 

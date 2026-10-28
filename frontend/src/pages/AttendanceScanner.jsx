@@ -31,49 +31,25 @@ const AttendanceScanner = () => {
   }, [loading]);
 
   useEffect(() => {
-    if (scanMode === 'padres') {
-      fetchMeetings();
-    }
-  }, [scanMode]);
+    if (scanMode !== 'padres') return undefined;
 
-  const fetchMeetings = async () => {
-    try {
-      const response = await api.get('/meetings/active');
-      setActiveMeetings(response.data);
-      if (response.data.length > 0) {
-        setSelectedMeeting(response.data[0].id.toString());
-      }
-    } catch (err) {
-      console.error('Error fetching meetings:', err);
-    }
-  };
-
-  useEffect(() => {
-    const scanner = new Html5QrcodeScanner('reader', {
-      qrbox: { width: 250, height: 250 },
-      fps: 10,
-    });
-
-    scanner.render(onScanSuccess, onScanError);
-
-    async function onScanSuccess(decodedText) {
-      const now = Date.now();
-      if (lastScanned.current.uuid === decodedText && now - lastScanned.current.time < 5000) {
-        return;
-      }
-
-      lastScanned.current = { uuid: decodedText, time: now };
-      handleAttendance(decodedText, scanModeRef.current, selectedMeetingRef.current);
-    }
-
-    function onScanError(err) {
-      // console.warn(err);
-    }
+    let active = true;
+    api.get('/meetings/active')
+      .then((response) => {
+        if (!active) return;
+        setActiveMeetings(response.data);
+        if (response.data.length > 0) {
+          setSelectedMeeting(response.data[0].id.toString());
+        }
+      })
+      .catch((err) => {
+        console.error('Error fetching meetings:', err);
+      });
 
     return () => {
-      scanner.clear();
+      active = false;
     };
-  }, []);
+  }, [scanMode]);
 
   const handleAttendance = async (uuid, currentMode = scanModeRef.current, currentMeeting = selectedMeetingRef.current) => {
     if (loadingRef.current) return;
@@ -124,6 +100,31 @@ const AttendanceScanner = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const scanner = new Html5QrcodeScanner('reader', {
+      qrbox: { width: 250, height: 250 },
+      fps: 10,
+    });
+
+    scanner.render(onScanSuccess, onScanError);
+
+    async function onScanSuccess(decodedText) {
+      const now = Date.now();
+      if (lastScanned.current.uuid === decodedText && now - lastScanned.current.time < 5000) {
+        return;
+      }
+
+      lastScanned.current = { uuid: decodedText, time: now };
+      handleAttendance(decodedText, scanModeRef.current, selectedMeetingRef.current);
+    }
+
+    function onScanError() {}
+
+    return () => {
+      scanner.clear();
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6 flex flex-col items-center">
