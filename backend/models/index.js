@@ -4,6 +4,8 @@ const Parent = require('./Parent');
 const Student = require('./Student');
 const StudentParent = require('./StudentParent');
 const Attendance = require('./Attendance');
+const Meeting = require('./Meeting');
+const MeetingAttendance = require('./MeetingAttendance');
 const PasswordResetToken = require('./PasswordResetToken');
 const AuditLog = require('./AuditLog');
 
@@ -33,6 +35,22 @@ User.hasOne(Student, { foreignKey: 'user_id' });
 Parent.belongsToMany(Student, { through: StudentParent, foreignKey: 'parent_id' });
 Student.belongsToMany(Parent, { through: StudentParent, foreignKey: 'student_id' });
 
+// Direct associations for StudentParent
+StudentParent.belongsTo(Student, { foreignKey: 'student_id' });
+StudentParent.belongsTo(Parent, { foreignKey: 'parent_id' });
+Student.hasMany(StudentParent, { foreignKey: 'student_id' });
+Parent.hasMany(StudentParent, { foreignKey: 'parent_id' });
+
+// Attendance & Student
+Student.hasMany(Attendance, { foreignKey: 'student_id' });
+Attendance.belongsTo(Student, { foreignKey: 'student_id' });
+
+// Meeting & MeetingAttendance
+Meeting.hasMany(MeetingAttendance, { foreignKey: 'meeting_id' });
+MeetingAttendance.belongsTo(Meeting, { foreignKey: 'meeting_id' });
+Parent.hasMany(MeetingAttendance, { foreignKey: 'parent_id' });
+MeetingAttendance.belongsTo(Parent, { foreignKey: 'parent_id' });
+
 module.exports = {
   Role,
   User,
@@ -40,6 +58,8 @@ module.exports = {
   Student,
   StudentParent,
   Attendance,
+  Meeting,
+  MeetingAttendance,
   PasswordResetToken,
   AuditLog
 };

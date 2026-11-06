@@ -24,36 +24,43 @@ import AttendancePanel from './AttendancePanel';
 import Reports from './Reports';
 import MeetingManagement from './MeetingManagement';
 import MeetingAttendancePanel from './MeetingAttendancePanel';
-
-const FamilyHome = ({ user }) => (
-  <section className="welcome-panel">
-    <div className="welcome-copy">
-      <div className="inline-flex items-center gap-2 badge-soft">
-        <ShieldCheck size={14} />
-        Portal familiar
-      </div>
-      <h3>Bienvenido, {user?.email?.split('@')[0] || 'familia'}.</h3>
-      <p>
-        Tu cuenta está activa. Próximamente podrás consultar aquí la asistencia, reuniones y
-        el carnet QR de tus hijos. Si necesitas información urgente, contacta al colegio.
-      </p>
-    </div>
-    <div className="mini-stats">
-      <div className="mini-stat">
-        <span>Cuenta</span>
-        <strong className="capitalize">{user?.role}</strong>
-      </div>
-    </div>
-  </section>
-);
+import MyFamilyDashboard from './MyFamilyDashboard';
+import MyAttendance from './MyAttendance';
+import MyMeetings from './MyMeetings';
+import MyQR from './MyQR';
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const canViewStats = ['admin', 'director', 'docente'].includes(user?.role);
   const isFamilyRole = ['padre', 'estudiante'].includes(user?.role);
 
-  const menuItems = [
-    { title: 'Inicio', icon: Home, path: '/dashboard', color: 'bg-slate-500', role: ['admin', 'docente', 'director', 'padre', 'estudiante'] },
+  const familyMenuItems = [
+    { title: 'Inicio', icon: Home, path: '/dashboard', color: 'bg-emerald-600', role: ['padre', 'estudiante'] },
+    {
+      title: user?.role === 'padre' ? 'Asistencia de Hijos' : 'Mi Asistencia',
+      icon: Calendar,
+      path: '/dashboard/my-attendance',
+      color: 'bg-teal-600',
+      role: ['padre', 'estudiante']
+    },
+    {
+      title: user?.role === 'padre' ? 'Reuniones de Padres' : 'Reuniones y Eventos',
+      icon: Users,
+      path: '/dashboard/my-meetings',
+      color: 'bg-violet-600',
+      role: ['padre', 'estudiante']
+    },
+    {
+      title: user?.role === 'padre' ? 'Carnets QR' : 'Mi Carnet QR',
+      icon: QrCode,
+      path: '/dashboard/my-qr',
+      color: 'bg-sky-600',
+      role: ['padre', 'estudiante']
+    },
+  ];
+
+  const adminMenuItems = [
+    { title: 'Inicio', icon: Home, path: '/dashboard', color: 'bg-slate-500', role: ['admin', 'docente', 'director'] },
     { title: 'Escáner QR', icon: QrCode, path: '/scanner', color: 'bg-sky-500', role: ['admin', 'docente', 'director'] },
     { title: 'Estudiantes', icon: Users, path: '/dashboard/students', color: 'bg-emerald-500', role: ['admin', 'docente', 'director'] },
     { title: 'Padres o Apoderados', icon: User, path: '/dashboard/parents', color: 'bg-blue-500', role: ['admin', 'director'] },
@@ -62,7 +69,9 @@ const Dashboard = () => {
     { title: 'Reportes', icon: BarChart3, path: '/dashboard/reports', color: 'bg-fuchsia-500', role: ['admin', 'director', 'docente'] },
   ];
 
-  const filteredMenu = menuItems.filter(item => item.role.includes(user?.role));
+  const filteredMenu = isFamilyRole
+    ? familyMenuItems
+    : adminMenuItems.filter(item => item.role.includes(user?.role));
 
   const [loadingStats, setLoadingStats] = useState(canViewStats);
   const [statsData, setStatsData] = useState({
@@ -191,7 +200,7 @@ const Dashboard = () => {
             index
             element={
               isFamilyRole ? (
-                <FamilyHome user={user} />
+                <MyFamilyDashboard />
               ) : (
                 <>
                 <section className="welcome-panel">
@@ -328,6 +337,33 @@ const Dashboard = () => {
               )
             }
           />
+          {/* Rutas exclusivas del portal de familias */}
+          <Route
+            path="my-attendance"
+            element={
+              <RoleRoute roles={['padre', 'estudiante']}>
+                <MyAttendance />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="my-meetings"
+            element={
+              <RoleRoute roles={['padre', 'estudiante']}>
+                <MyMeetings />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="my-qr"
+            element={
+              <RoleRoute roles={['padre', 'estudiante']}>
+                <MyQR />
+              </RoleRoute>
+            }
+          />
+
+          {/* Rutas administrativas */}
           <Route
             path="students"
             element={

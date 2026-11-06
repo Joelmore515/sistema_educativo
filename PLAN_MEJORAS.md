@@ -148,27 +148,27 @@
 
 ### Backend
 
-- [ ] Crear rutas `/api/me`:
+- [x] Crear rutas `/api/me`:
   - `GET /api/me/profile`
   - `GET /api/me/children` (padre)
   - `GET /api/me/student` (estudiante)
   - `GET /api/me/attendance?child_id=&from=&to=`
   - `GET /api/me/meetings`
   - `GET /api/me/notifications`
-- [ ] Resolver el vínculo padre-hijo con `StudentParent` y el vínculo estudiante-usuario con `Student.user_id`.
-- [ ] Validar que `child_id` pertenezca al padre autenticado antes de devolver datos.
-- [ ] Devolver resumen de asistencia: presentes, tardanzas, faltas, faltas justificadas y porcentaje.
-- [ ] Devolver próximas reuniones y estado de asistencia del padre.
+- [x] Resolver el vínculo padre-hijo con `StudentParent` y el vínculo estudiante-usuario con `Student.user_id`.
+- [x] Validar que `child_id` pertenezca al padre autenticado antes de devolver datos.
+- [x] Devolver resumen de asistencia: presentes, tardanzas, faltas, faltas justificadas y porcentaje.
+- [x] Devolver próximas reuniones y estado de asistencia del padre.
 
 ### Frontend
 
-- [ ] Crear `MyFamilyDashboard.jsx` con selector de hijo cuando el padre tenga más de uno.
-- [ ] Crear `MyAttendance.jsx` con historial, filtros por fecha y estado, y detalle de justificaciones.
-- [ ] Crear `MyMeetings.jsx` con reuniones próximas y estado de asistencia.
-- [ ] Crear `MyQR.jsx` para mostrar y descargar el carnet QR del estudiante o del padre.
-- [ ] Actualizar el menú de `Dashboard.jsx` para que padre y estudiante solo vean sus módulos.
-- [ ] Eliminar el acceso de padre/estudiante al `AttendancePanel` administrativo.
-- [ ] Mostrar mensajes claros cuando no haya hijos vinculados o no haya asistencia registrada.
+- [x] Crear `MyFamilyDashboard.jsx` con selector de hijo cuando el padre tenga más de uno.
+- [x] Crear `MyAttendance.jsx` con historial, filtros por fecha y estado, y detalle de justificaciones.
+- [x] Crear `MyMeetings.jsx` con reuniones próximas y estado de asistencia.
+- [x] Crear `MyQR.jsx` para mostrar y descargar el carnet QR del estudiante o del padre.
+- [x] Actualizar el menú de `Dashboard.jsx` para que padre y estudiante solo vean sus módulos.
+- [x] Eliminar el acceso de padre/estudiante al `AttendancePanel` administrativo.
+- [x] Mostrar mensajes claros cuando no haya hijos vinculados o no haya asistencia registrada.
 
 ### Criterios de aceptación
 
