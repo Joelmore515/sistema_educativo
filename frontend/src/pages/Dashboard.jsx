@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Loader2,
   Home,
+  UserCog,
 } from 'lucide-react';
 import { Link, Routes, Route } from 'react-router-dom';
 import { RoleRoute } from '../components/RouteGuards';
@@ -28,6 +29,7 @@ import MyFamilyDashboard from './MyFamilyDashboard';
 import MyAttendance from './MyAttendance';
 import MyMeetings from './MyMeetings';
 import MyQR from './MyQR';
+import UserManagement from './UserManagement';
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -67,6 +69,7 @@ const Dashboard = () => {
     { title: 'Reuniones', icon: Calendar, path: '/dashboard/meetings', color: 'bg-violet-500', role: ['admin', 'director'] },
     { title: 'Asistencia', icon: Calendar, path: '/dashboard/attendance', color: 'bg-amber-500', role: ['admin', 'docente', 'director'] },
     { title: 'Reportes', icon: BarChart3, path: '/dashboard/reports', color: 'bg-fuchsia-500', role: ['admin', 'director', 'docente'] },
+    { title: 'Usuarios', icon: UserCog, path: '/dashboard/users', color: 'bg-indigo-500', role: ['admin'] },
   ];
 
   const filteredMenu = isFamilyRole
@@ -409,6 +412,14 @@ const Dashboard = () => {
             element={
               <RoleRoute roles={['admin', 'director', 'docente']}>
                 <Reports />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="users"
+            element={
+              <RoleRoute roles={['admin']}>
+                <UserManagement />
               </RoleRoute>
             }
           />
