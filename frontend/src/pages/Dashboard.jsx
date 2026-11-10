@@ -137,8 +137,8 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard-shell min-h-screen bg-slate-100 text-slate-800">
-      <aside className="dashboard-sidebar hidden md:flex flex-col">
-        <div className="p-6 border-b border-slate-200/80">
+      <aside className="dashboard-sidebar hidden md:flex flex-col h-screen sticky top-0 shrink-0 select-none">
+        <div className="p-6 border-b border-slate-200/80 shrink-0">
           <div className="flex items-center gap-3">
             <div className="logo-mark">E</div>
             <div>
@@ -148,7 +148,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <nav className="flex-1 px-4 py-6 space-y-2">
+        <nav className="flex-1 px-4 py-6 space-y-2 sidebar-scroll min-h-0">
           {filteredMenu.map((item) => (
             <Link
               key={item.path}
@@ -163,7 +163,7 @@ const Dashboard = () => {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-slate-200/80">
+        <div className="p-4 border-t border-slate-200/80 shrink-0">
           <button
             onClick={logout}
             className="logout-btn"
@@ -174,7 +174,7 @@ const Dashboard = () => {
         </div>
       </aside>
 
-      <main className="dashboard-main flex-1 p-4 md:p-8 pb-24 md:pb-8">
+      <main className="dashboard-main flex-1 p-4 md:p-8 pb-24 md:pb-8 min-w-0">
         <header className="dashboard-header mb-8">
           <div>
             <p className="eyebrow">Panel principal</p>
@@ -206,136 +206,108 @@ const Dashboard = () => {
                 <MyFamilyDashboard />
               ) : (
                 <>
-                <section className="welcome-panel">
-                  <div className="welcome-copy">
-                    <div className="inline-flex items-center gap-2 badge-soft">
-                      <Sparkles size={14} />
-                      Rendimiento escolar
-                    </div>
-                    <h3>Tu operación educativa está en marcha.</h3>
-                    <p>
-                      Monitorea la asistencia, gestiona estudiantes y revisa reportes de forma más ágil y organizada.
-                    </p>
-                    <div className="welcome-actions">
-                      <Link to={filteredMenu[0]?.path || '/dashboard'} className="primary-action group">
-                        Ir al módulo
-                        <ChevronRight size={18} className="transition-transform group-hover:translate-x-1" />
-                      </Link>
-                      <button className="secondary-action hover:bg-white/20 transition-colors">Ver resumen</button>
-                    </div>
-                  </div>
-
-                  <div className="mini-stats">
-                    <div className="mini-stat">
-                      <span>Presencia</span>
-                      <strong>{loadingStats ? '--' : `${statsData.attendancePercentage}%`}</strong>
-                    </div>
-                    <div className="mini-stat">
-                      <span>Estudiantes</span>
-                      <strong>{loadingStats ? '--' : statsData.totalStudents}</strong>
-                    </div>
-                  </div>
-                </section>
-
-                <section className="stats-grid">
-                  {summaryStats.map((stat) => (
-                    <div key={stat.label} className="stat-card">
-                      <div className="stat-top">
-                        <div className={`stat-icon ${stat.tone}`}>
-                          <stat.icon size={20} />
-                        </div>
-                        <span className="stat-change">{stat.change}</span>
+                  <section className="welcome-panel">
+                    <div className="welcome-copy">
+                      <div className="inline-flex items-center gap-2 badge-soft">
+                        <Sparkles size={14} />
+                        Rendimiento escolar
                       </div>
-                      <p className="stat-label">{stat.label}</p>
-                      <h4 className="stat-value">{stat.value}</h4>
-                    </div>
-                  ))}
-                </section>
-
-                <section className="content-grid">
-                  <div className="panel-panel large-panel">
-                    <div className="panel-header">
-                      <div>
-                        <p className="label-muted">Vista general</p>
-                        <h3>Asistencia por semana</h3>
-                      </div>
-                      <div className={`trend-badge ${statsData.attendanceTrend < 0 ? 'bg-red-100 text-red-600' : ''}`}>
-                        {statsData.attendanceTrend >= 0 ? (
-                          <ArrowUpRight size={14} />
-                        ) : (
-                          <ArrowUpRight size={14} className="rotate-90" />
-                        )}
-                        {statsData.attendanceTrend > 0 ? '+' : ''}{statsData.attendanceTrend}%
+                      <h3>Tu operación educativa está en marcha.</h3>
+                      <p>
+                        Monitorea la asistencia, gestiona estudiantes y revisa reportes de forma más ágil y organizada.
+                      </p>
+                      <div className="welcome-actions">
+                        <Link to={filteredMenu[0]?.path || '/dashboard'} className="primary-action group">
+                          Ir al módulo
+                          <ChevronRight size={18} className="transition-transform group-hover:translate-x-1" />
+                        </Link>
+                        <button className="secondary-action hover:bg-white/20 transition-colors">Ver resumen</button>
                       </div>
                     </div>
 
-                    <div className="chart-bars">
-                      {performanceBars.map((bar, index) => (
-                        <div key={index} className="chart-column">
-                          <span className="chart-value">{bar}%</span>
-                          <div className="chart-fill" style={{ height: `${bar}%` }} />
-                          <small>{['L', 'M', 'M', 'J', 'V', 'S'][index]}</small>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="panel-panel side-panel">
-                    <div className="panel-header">
-                      <div>
-                        <p className="label-muted">Actividad</p>
-                        <h3>Reciente</h3>
+                    <div className="mini-stats">
+                      <div className="mini-stat">
+                        <span>Presencia</span>
+                        <strong>{loadingStats ? '--' : `${statsData.attendancePercentage}%`}</strong>
+                      </div>
+                      <div className="mini-stat">
+                        <span>Estudiantes</span>
+                        <strong>{loadingStats ? '--' : statsData.totalStudents}</strong>
                       </div>
                     </div>
+                  </section>
 
-                    <div className="activity-list relative min-h-[150px]">
-                      {loadingStats ? (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <Loader2 className="animate-spin text-emerald-500" size={24} />
-                        </div>
-                      ) : recentActivity.length === 0 ? (
-                        <p className="text-sm text-slate-400 text-center mt-8">No hay actividad reciente hoy</p>
-                      ) : recentActivity.map((item, index) => (
-                        <div key={index} className="activity-item">
-                          <div className={`activity-dot ${item.tone}`} />
-                          <div className="activity-copy">
-                            <strong>{item.name}</strong>
-                            <span>{item.action}</span>
+                  <section className="stats-grid">
+                    {summaryStats.map((stat) => (
+                      <div key={stat.label} className="stat-card">
+                        <div className="stat-top">
+                          <div className={`stat-icon ${stat.tone}`}>
+                            <stat.icon size={20} />
                           </div>
-                          <time>{item.time}</time>
+                          <span className="stat-change">{stat.change}</span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                </section>
-
-                <section className="modules-panel panel-panel">
-                  <div className="panel-header">
-                    <div>
-                      <p className="label-muted">Acceso rápido</p>
-                      <h3>Módulos del sistema</h3>
-                    </div>
-                  </div>
-
-                  <div className="modules-grid">
-                    {filteredMenu.map((item) => (
-                      <Link
-                        key={item.path}
-                        to={item.path}
-                        className="module-card"
-                      >
-                        <div className={`${item.color} module-icon`}>
-                          <item.icon size={22} />
-                        </div>
-                        <div className="module-text">
-                          <h4>{item.title}</h4>
-                          <p>Acceder al módulo</p>
-                        </div>
-                        <ChevronRight size={18} className="module-arrow" />
-                      </Link>
+                        <p className="stat-label">{stat.label}</p>
+                        <h4 className="stat-value">{stat.value}</h4>
+                      </div>
                     ))}
-                  </div>
-                </section>
+                  </section>
+
+                  <section className="content-grid">
+                    <div className="panel-panel large-panel">
+                      <div className="panel-header">
+                        <div>
+                          <p className="label-muted">Vista general</p>
+                          <h3>Asistencia por semana</h3>
+                        </div>
+                        <div className={`trend-badge ${statsData.attendanceTrend < 0 ? 'bg-red-100 text-red-600' : ''}`}>
+                          {statsData.attendanceTrend >= 0 ? (
+                            <ArrowUpRight size={14} />
+                          ) : (
+                            <ArrowUpRight size={14} className="rotate-90" />
+                          )}
+                          {statsData.attendanceTrend > 0 ? '+' : ''}{statsData.attendanceTrend}%
+                        </div>
+                      </div>
+
+                      <div className="chart-bars">
+                        {performanceBars.map((bar, index) => (
+                          <div key={index} className="chart-column">
+                            <span className="chart-value">{bar}%</span>
+                            <div className="chart-fill" style={{ height: `${bar}%` }} />
+                            <small>{['L', 'M', 'M', 'J', 'V', 'S'][index]}</small>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="panel-panel side-panel">
+                      <div className="panel-header">
+                        <div>
+                          <p className="label-muted">Actividad</p>
+                          <h3>Reciente</h3>
+                        </div>
+                      </div>
+
+                      <div className="activity-list relative min-h-[150px]">
+                        {loadingStats ? (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Loader2 className="animate-spin text-emerald-500" size={24} />
+                          </div>
+                        ) : recentActivity.length === 0 ? (
+                          <p className="text-sm text-slate-400 text-center mt-8">No hay actividad reciente hoy</p>
+                        ) : recentActivity.map((item, index) => (
+                          <div key={index} className="activity-item">
+                            <div className={`activity-dot ${item.tone}`} />
+                            <div className="activity-copy">
+                              <strong>{item.name}</strong>
+                              <span>{item.action}</span>
+                            </div>
+                            <time>{item.time}</time>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </section>
                 </>
               )
             }
