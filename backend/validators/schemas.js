@@ -40,7 +40,9 @@ const parentPayloadSchema = z.object({
   parent_dni: optionalDni,
   parent_first_name: text(100).optional().nullable(),
   parent_last_name: text(100).optional().nullable(),
-  parent_phone: text(30).optional().nullable()
+  parent_phone: text(30).optional().nullable(),
+  parent_email: optionalEmail,
+  parent_password: optionalPassword
 });
 
 const createStudentSchema = z.object({
@@ -69,8 +71,8 @@ const createParentSchema = z.object({
   first_name: text(100).min(1, 'El nombre es obligatorio'),
   last_name: text(100).min(1, 'El apellido es obligatorio'),
   dni: optionalDni,
-  email: optionalEmail,
-  password: optionalPassword,
+  email,
+  password,
   phone: text(30).optional().nullable()
 });
 

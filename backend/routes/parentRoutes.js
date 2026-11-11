@@ -7,6 +7,12 @@ const { createParentSchema, updateParentSchema } = require('../validators/schema
 const { auditRoute } = require('../utils/audit');
 
 router.get('/', verifyToken, requireRole('admin', 'director'), parentController.getAllParents);
+router.get(
+  '/by-dni/:dni',
+  verifyToken,
+  requireRole('admin', 'director'),
+  parentController.getParentByDni
+);
 router.post(
   '/',
   verifyToken,

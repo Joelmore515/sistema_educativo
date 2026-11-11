@@ -61,14 +61,19 @@ Recuperación de contraseña:
 | PUT | `/students/:id` | `admin`, `director` |
 | DELETE | `/students/:id` | `admin`, `director` |
 
+Al registrar o actualizar un estudiante se debe enviar al menos un apoderado. Si el apoderado es nuevo o aún no tiene cuenta, `parent_email` y `parent_password` son obligatorios. Si ya tiene `user_id`, la cuenta existente se reutiliza.
+
 ## Padres
 
 | Método | Ruta | Roles |
 | --- | --- | --- |
 | GET | `/parents` | `admin`, `director` |
+| GET | `/parents/by-dni/:dni` | `admin`, `director` |
 | POST | `/parents` | `admin`, `director` |
 | PUT | `/parents/:id` | `admin`, `director` |
 | DELETE | `/parents/:id` | `admin`, `director` |
+
+`POST /parents` requiere `email` y `password` para crear la cuenta de acceso con rol `padre`. En `PUT /parents/:id`, si el apoderado no tiene cuenta, también son obligatorios; si ya la tiene, la contraseña solo se actualiza cuando se envía.
 
 ## Asistencia
 

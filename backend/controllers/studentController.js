@@ -1,6 +1,15 @@
-const { Student, Parent, User, Role } = require('../models');
+const { Student, Parent, User, Role, StudentParent } = require('../models');
+const sequelize = require('../config/db');
 const bcrypt = require('bcryptjs');
 const { generateQR } = require('../utils/qrGenerator');
+
+const buildHttpError = (status, message) => {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+};
+
+const normalizeEmail = (value) => (value || '').trim().toLowerCase();
 
 const formatStudentResponse = (student) => ({
   id: student.id,
@@ -13,20 +22,72 @@ const formatStudentResponse = (student) => ({
   User: student.User ? { id: student.User.id, email: student.User.email } : null
 });
 
-const handleParentAssociation = async (student, parentData) => {
-  if (!parentData || !parentData.parent_dni) return null;
+const parentInclude = () => ({
+  model: Parent,
+  include: [{ model: User, attributes: ['id', 'email', 'role_id'] }]
+});
 
+const getRole = async (name, transaction) => {
+  const role = await Role.findOne({ where: { name }, transaction });
+  if (!role) {
+    throw buildHttpError(500, `Error de configuración: Rol ${name} no encontrado`);
+  }
+  return role;
+};
+
+const ensureParentAccount = async (parent, parentData, transaction) => {
+  if (parent.user_id) {
+    const linkedUser = await User.findByPk(parent.user_id, { transaction });
+    if (linkedUser) {
+      return parent;
+    }
+    parent.user_id = null;
+  }
+
+  const email = normalizeEmail(parentData.parent_email);
+  const password = parentData.parent_password;
+
+  if (!email || !password) {
+    throw buildHttpError(
+      400,
+      'El correo y la contraseña del apoderado son obligatorios para crear su cuenta de acceso'
+    );
+  }
+
+  const existingUser = await User.findOne({ where: { email }, transaction });
+  if (existingUser) {
+    throw buildHttpError(400, 'El correo electrónico ya está registrado para otro usuario');
+  }
+
+  const role = await getRole('padre', transaction);
+  const user = await User.create({
+    email,
+    password: await bcrypt.hash(password, 10),
+    role_id: role.id
+  }, { transaction });
+
+  parent.user_id = user.id;
+  await parent.save({ transaction });
+
+  return parent;
+};
+
+const getOrCreateParent = async (parentData, transaction) => {
   let parent = null;
 
   if (parentData.id) {
-    parent = await Parent.findByPk(parentData.id);
+    parent = await Parent.findByPk(parentData.id, { transaction });
+  }
+
+  if (!parent && parentData.parent_dni) {
+    parent = await Parent.findOne({ where: { dni: parentData.parent_dni }, transaction });
   }
 
   if (!parent) {
-    parent = await Parent.findOne({ where: { dni: parentData.parent_dni } });
-  }
+    if (!parentData.parent_dni) {
+      throw buildHttpError(400, 'El DNI del apoderado es obligatorio');
+    }
 
-  if (!parent) {
     const { uuid: parentUuid } = await generateQR();
     parent = await Parent.create({
       first_name: parentData.parent_first_name || '',
@@ -34,28 +95,38 @@ const handleParentAssociation = async (student, parentData) => {
       dni: parentData.parent_dni,
       phone: parentData.parent_phone || null,
       qr_code_uuid: parentUuid
-    });
+    }, { transaction });
   } else {
-    let updated = false;
-    if (parentData.parent_first_name !== undefined) {
-      parent.first_name = parentData.parent_first_name;
-      updated = true;
+    const updates = {};
+
+    if (parentData.parent_first_name) updates.first_name = parentData.parent_first_name;
+    if (parentData.parent_last_name) updates.last_name = parentData.parent_last_name;
+    if (parentData.parent_phone !== undefined && parentData.parent_phone !== null && parentData.parent_phone !== '') {
+      updates.phone = parentData.parent_phone;
     }
-    if (parentData.parent_last_name !== undefined) {
-      parent.last_name = parentData.parent_last_name;
-      updated = true;
+
+    if (Object.keys(updates).length > 0) {
+      await parent.update(updates, { transaction });
     }
-    if (parentData.parent_phone !== undefined) {
-      parent.phone = parentData.parent_phone;
-      updated = true;
-    }
-    if (updated) await parent.save();
   }
 
-  const isAssociated = await student.hasParent(parent);
-  if (!isAssociated) {
-    await student.addParent(parent);
-  }
+  await ensureParentAccount(parent, parentData, transaction);
+  return parent;
+};
+
+const handleParentAssociation = async (student, parentData, transaction) => {
+  if (!parentData) return null;
+  if (!parentData.id && !parentData.parent_dni) return null;
+
+  const parent = await getOrCreateParent(parentData, transaction);
+
+  await StudentParent.findOrCreate({
+    where: {
+      student_id: student.id,
+      parent_id: parent.id
+    },
+    transaction
+  });
 
   return parent;
 };
@@ -73,57 +144,65 @@ exports.registerStudent = async (req, res) => {
       password
     } = req.body;
 
-    if (dni) {
-      const existingStudent = await Student.findOne({ where: { dni } });
-      if (existingStudent) {
-        return res.status(400).json({ message: 'El DNI del estudiante ya está registrado' });
-      }
-    }
-
-    let userId = null;
-    // Crear cuenta de usuario si se proporciona email
-    if (email) {
-      const existingUser = await User.findOne({ where: { email } });
-      if (existingUser) {
-        return res.status(400).json({ message: 'El correo electrónico ya está registrado para otro usuario' });
-      }
-
-      const role = await Role.findOne({ where: { name: 'estudiante' } });
-      if (!role) {
-        return res.status(500).json({ message: 'Error de configuración: Rol estudiante no encontrado' });
-      }
-
-      const rawPassword = password && password.trim() ? password : (dni || '123456');
-      const hashedPassword = await bcrypt.hash(rawPassword, 10);
-
-      const user = await User.create({
-        email,
-        password: hashedPassword,
-        role_id: role.id
+    if (!Array.isArray(parents) || parents.length === 0) {
+      return res.status(400).json({
+        message: 'Debe registrar al menos un apoderado con su correo y contraseña de acceso'
       });
-      userId = user.id;
     }
 
-    const { uuid } = await generateQR();
-
-    const student = await Student.create({
-      first_name,
-      last_name,
-      dni,
-      grade_section: grade_section || section_id || null,
-      qr_code_uuid: uuid,
-      user_id: userId
-    });
-
-    if (parents && Array.isArray(parents)) {
-      for (const parentData of parents) {
-        await handleParentAssociation(student, parentData);
+    const student = await sequelize.transaction(async (transaction) => {
+      if (dni) {
+        const existingStudent = await Student.findOne({ where: { dni }, transaction });
+        if (existingStudent) {
+          throw buildHttpError(400, 'El DNI del estudiante ya está registrado');
+        }
       }
-    }
+
+      let userId = null;
+
+      if (email) {
+        const normalizedEmail = normalizeEmail(email);
+        const existingUser = await User.findOne({ where: { email: normalizedEmail }, transaction });
+        if (existingUser) {
+          throw buildHttpError(400, 'El correo electrónico ya está registrado para otro usuario');
+        }
+
+        const role = await getRole('estudiante', transaction);
+        const rawPassword = password && password.trim() ? password : (dni || '123456');
+        const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
+        const user = await User.create({
+          email: normalizedEmail,
+          password: hashedPassword,
+          role_id: role.id
+        }, { transaction });
+        userId = user.id;
+      }
+
+      const { uuid } = await generateQR();
+
+      const createdStudent = await Student.create({
+        first_name,
+        last_name,
+        dni,
+        grade_section: grade_section || section_id || null,
+        qr_code_uuid: uuid,
+        user_id: userId
+      }, { transaction });
+
+      for (const parentData of parents) {
+        const parent = await handleParentAssociation(createdStudent, parentData, transaction);
+        if (!parent) {
+          throw buildHttpError(400, 'Los datos del apoderado están incompletos');
+        }
+      }
+
+      return createdStudent;
+    });
 
     const fullStudent = await Student.findByPk(student.id, {
       include: [
-        { model: Parent },
+        parentInclude(),
         { model: User, attributes: ['id', 'email', 'role_id'] }
       ]
     });
@@ -133,7 +212,14 @@ exports.registerStudent = async (req, res) => {
       student: fullStudent || formatStudentResponse(student)
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error al registrar estudiante', error: error.message });
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ message: 'Ya existe un registro con los mismos datos' });
+    }
+
+    res.status(error.status || 500).json({
+      message: error.status ? error.message : 'Error al registrar estudiante',
+      error: error.message
+    });
   }
 };
 
@@ -141,7 +227,7 @@ exports.getAllStudents = async (req, res) => {
   try {
     const students = await Student.findAll({
       include: [
-        { model: Parent },
+        parentInclude(),
         { model: User, attributes: ['id', 'email', 'role_id'] }
       ],
       order: [['id', 'ASC']]
@@ -166,74 +252,73 @@ exports.updateStudent = async (req, res) => {
       password
     } = req.body;
 
-    const student = await Student.findByPk(id, {
-      include: [
-        { model: Parent },
-        { model: User }
-      ]
-    });
-    if (!student) {
-      return res.status(404).json({ message: 'Estudiante no encontrado' });
-    }
-
-    if (dni && dni !== student.dni) {
-      const existingStudent = await Student.findOne({ where: { dni } });
-      if (existingStudent && existingStudent.id !== Number(id)) {
-        return res.status(400).json({ message: 'El DNI del estudiante ya está registrado' });
+    await sequelize.transaction(async (transaction) => {
+      const student = await Student.findByPk(id, { transaction });
+      if (!student) {
+        throw buildHttpError(404, 'Estudiante no encontrado');
       }
-    }
 
-    student.first_name = first_name ?? student.first_name;
-    student.last_name = last_name ?? student.last_name;
-    student.dni = dni ?? student.dni;
-    student.grade_section = grade_section ?? section_id ?? student.grade_section;
+      if (dni && dni !== student.dni) {
+        const existingStudent = await Student.findOne({ where: { dni }, transaction });
+        if (existingStudent && existingStudent.id !== Number(id)) {
+          throw buildHttpError(400, 'El DNI del estudiante ya está registrado');
+        }
+      }
 
-    // Gestionar cuenta de usuario del estudiante
-    if (email) {
-      if (student.user_id) {
-        const user = await User.findByPk(student.user_id);
-        if (user) {
-          const existingEmailUser = await User.findOne({ where: { email } });
-          if (existingEmailUser && existingEmailUser.id !== user.id) {
-            return res.status(400).json({ message: 'El correo electrónico ya está registrado para otro usuario' });
+      student.first_name = first_name ?? student.first_name;
+      student.last_name = last_name ?? student.last_name;
+      student.dni = dni ?? student.dni;
+      student.grade_section = grade_section ?? section_id ?? student.grade_section;
+
+      if (email) {
+        const normalizedEmail = normalizeEmail(email);
+
+        if (student.user_id) {
+          const user = await User.findByPk(student.user_id, { transaction });
+          if (!user) {
+            throw buildHttpError(404, 'La cuenta del estudiante no existe');
           }
 
-          const updates = { email };
+          const existingEmailUser = await User.findOne({ where: { email: normalizedEmail }, transaction });
+          if (existingEmailUser && existingEmailUser.id !== user.id) {
+            throw buildHttpError(400, 'El correo electrónico ya está registrado para otro usuario');
+          }
+
+          const updates = { email: normalizedEmail };
           if (password && password.trim()) {
             updates.password = await bcrypt.hash(password, 10);
           }
-          await user.update(updates);
+          await user.update(updates, { transaction });
+        } else {
+          const existingEmailUser = await User.findOne({ where: { email: normalizedEmail }, transaction });
+          if (existingEmailUser) {
+            throw buildHttpError(400, 'El correo electrónico ya está registrado para otro usuario');
+          }
+
+          const role = await getRole('estudiante', transaction);
+          const rawPassword = password && password.trim() ? password : (dni || student.dni || '123456');
+
+          const newUser = await User.create({
+            email: normalizedEmail,
+            password: await bcrypt.hash(rawPassword, 10),
+            role_id: role.id
+          }, { transaction });
+          student.user_id = newUser.id;
         }
-      } else {
-        const existingEmailUser = await User.findOne({ where: { email } });
-        if (existingEmailUser) {
-          return res.status(400).json({ message: 'El correo electrónico ya está registrado para otro usuario' });
+      }
+
+      await student.save({ transaction });
+
+      if (parents && Array.isArray(parents)) {
+        for (const parentData of parents) {
+          await handleParentAssociation(student, parentData, transaction);
         }
-
-        const role = await Role.findOne({ where: { name: 'estudiante' } });
-        const rawPassword = password && password.trim() ? password : (dni || '123456');
-        const hashedPassword = await bcrypt.hash(rawPassword, 10);
-
-        const newUser = await User.create({
-          email,
-          password: hashedPassword,
-          role_id: role.id
-        });
-        student.user_id = newUser.id;
       }
-    }
-
-    await student.save();
-
-    if (parents && Array.isArray(parents)) {
-      for (const parentData of parents) {
-        await handleParentAssociation(student, parentData);
-      }
-    }
+    });
 
     const updatedStudent = await Student.findByPk(id, {
       include: [
-        { model: Parent },
+        parentInclude(),
         { model: User, attributes: ['id', 'email', 'role_id'] }
       ]
     });
@@ -243,7 +328,14 @@ exports.updateStudent = async (req, res) => {
       student: updatedStudent
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error al actualizar estudiante', error: error.message });
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ message: 'Ya existe un registro con los mismos datos' });
+    }
+
+    res.status(error.status || 500).json({
+      message: error.status ? error.message : 'Error al actualizar estudiante',
+      error: error.message
+    });
   }
 };
 

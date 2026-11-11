@@ -16,7 +16,13 @@ const StudentParent = sequelize.define('StudentParent', {
     allowNull: false
   }
 }, {
-  tableName: 'StudentParents'
+  tableName: 'StudentParents',
+  indexes: [
+    {
+      unique: true,
+      fields: ['student_id', 'parent_id']
+    }
+  ]
 });
 
 module.exports = StudentParent;

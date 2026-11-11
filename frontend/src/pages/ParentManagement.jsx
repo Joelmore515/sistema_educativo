@@ -19,7 +19,8 @@ const ParentManagement = () => {
     last_name: '',
     email: '',
     password: '',
-    phone: ''
+    phone: '',
+    has_account: false
   };
 
   const [newParent, setNewParent] = useState(initialParentState);
@@ -106,7 +107,8 @@ const ParentManagement = () => {
       last_name: parent.last_name,
       email: parent.User?.email || '',
       password: '',
-      phone: parent.phone || ''
+      phone: parent.phone || '',
+      has_account: Boolean(parent.User?.id)
     });
     setEditingParent(parent.id);
     setShowModal(true);
@@ -183,7 +185,7 @@ const ParentManagement = () => {
                 <td className="px-6 py-4">
                   <div className="flex flex-col space-y-1">
                     <span className="flex items-center text-sm text-slate-500"><Phone size={14} className="mr-1" /> {parent.phone || 'Sin tel.'}</span>
-                    <span className="flex items-center text-sm text-slate-500"><Mail size={14} className="mr-1" /> {parent.User?.email || 'Sin cuenta web'}</span>
+                    <span className={`flex items-center text-sm ${parent.User?.email ? 'text-slate-500' : 'text-amber-600'}`}><Mail size={14} className="mr-1" /> {parent.User?.email || 'Sin cuenta de acceso'}</span>
                   </div>
                 </td>
                 <td className="px-6 py-4 text-center">
@@ -257,16 +259,29 @@ const ParentManagement = () => {
                   value={newParent.phone} onChange={e => setNewParent({...newParent, phone: e.target.value})} />
               </div>
               <div className="p-4 bg-primary-50 rounded-2xl space-y-4">
-                <p className="text-xs font-bold text-primary-700 uppercase tracking-wider">Credenciales de Portal (Opcional)</p>
+                <div>
+                  <p className="text-xs font-bold text-primary-700 uppercase tracking-wider">Credenciales de Acceso</p>
+                  <p className="text-[11px] text-primary-600 mt-1">
+                    {newParent.has_account
+                      ? 'El apoderado ya tiene una cuenta. Puede cambiar el correo o dejar la contraseña vacía para mantenerla.'
+                      : 'El correo y la contraseña son obligatorios para crear la cuenta de acceso del apoderado.'}
+                  </p>
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                  <input type="email" className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none" 
+                  <input type="email" required className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
                     value={newParent.email} onChange={e => setNewParent({...newParent, email: e.target.value})} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
-                  <input type="password" title="Si se deja vacío, no se creará cuenta de acceso" className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none" 
-                    value={newParent.password} onChange={e => setNewParent({...newParent, password: e.target.value})} />
+                  <input
+                    type="password"
+                    required={!newParent.has_account}
+                    placeholder={newParent.has_account ? 'Dejar vacío para mantener la actual' : 'Mínimo 6 caracteres'}
+                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
+                    value={newParent.password}
+                    onChange={e => setNewParent({...newParent, password: e.target.value})}
+                  />
                 </div>
               </div>
               <button type="submit" className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all">

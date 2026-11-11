@@ -51,6 +51,7 @@ describe('Autorización de rutas', () => {
       request(app).get('/api/students'),
       request(app).post('/api/students').send({}),
       request(app).get('/api/parents'),
+      request(app).get('/api/parents/by-dni/12345678'),
       request(app).post('/api/parents').send({}),
       request(app).get('/api/attendance'),
       request(app).post('/api/attendance').send({}),
@@ -173,6 +174,10 @@ describe('Autorización de rutas', () => {
 
     const responses = await Promise.all([
       request(app).post('/api/students').set('Authorization', `Bearer ${token}`).send({}),
+      request(app).post('/api/parents').set('Authorization', `Bearer ${token}`).send({
+        first_name: 'Padre',
+        last_name: 'Prueba'
+      }),
       request(app).post('/api/users').set('Authorization', `Bearer ${token}`).send({}),
       request(app).post('/api/dni').set('Authorization', `Bearer ${token}`).send({ dni: '123' }),
       request(app).post('/api/attendance').set('Authorization', `Bearer ${token}`).send({}),

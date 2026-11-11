@@ -9,7 +9,10 @@ const createEmptyParent = () => ({
   parent_dni: '',
   parent_first_name: '',
   parent_last_name: '',
-  parent_phone: ''
+  parent_phone: '',
+  parent_email: '',
+  parent_password: '',
+  has_account: false
 });
 
 const createEmptyStudent = () => ({
@@ -85,12 +88,15 @@ const StudentManagement = () => {
   const openEditModal = (student) => {
     const parents = (student.Parents || []).length > 0
       ? (student.Parents || []).map(parent => ({
-          id: parent.id,
-          parent_dni: parent.dni || '',
-          parent_first_name: parent.first_name || '',
-          parent_last_name: parent.last_name || '',
-          parent_phone: parent.phone || ''
-        }))
+        id: parent.id,
+        parent_dni: parent.dni || '',
+        parent_first_name: parent.first_name || '',
+        parent_last_name: parent.last_name || '',
+        parent_phone: parent.phone || '',
+        parent_email: parent.User?.email || '',
+        parent_password: '',
+        has_account: Boolean(parent.User?.id)
+      }))
       : [createEmptyParent()];
 
     const gradeMatch = student.grade_section?.match(/\b([1-6])\b/);
@@ -122,18 +128,50 @@ const StudentManagement = () => {
     else setLoadingParentDni(prev => ({ ...prev, [index]: true }));
 
     try {
-      const { data } = await api.post('/dni', { dni });
-      if (data.success) {
-        if (type === 'student') {
-          setNewStudent(prev => ({ ...prev, first_name: data.data.nombres, last_name: data.data.apellidos }));
-        } else {
-          setNewStudent(prev => {
-            const newParents = [...prev.parents];
-            newParents[index] = { ...newParents[index], parent_first_name: data.data.nombres, parent_last_name: data.data.apellidos };
-            return { ...prev, parents: newParents };
-          });
+      const requests = [api.post('/dni', { dni })];
+      if (type === 'parent') requests.push(api.get(`/parents/by-dni/${dni}`));
+
+      const [dniResult, parentResult] = await Promise.allSettled(requests);
+      const dniData = dniResult.status === 'fulfilled' ? dniResult.value.data : null;
+      const parentData = parentResult?.status === 'fulfilled' ? parentResult.value.data : null;
+
+      if (type === 'student') {
+        if (dniData?.success) {
+          setNewStudent(prev => ({
+            ...prev,
+            first_name: dniData.data.nombres,
+            last_name: dniData.data.apellidos
+          }));
         }
+        return;
       }
+
+      setNewStudent(prev => {
+        const newParents = [...prev.parents];
+        const current = { ...newParents[index] };
+
+        if (dniData?.success) {
+          current.parent_first_name = dniData.data.nombres;
+          current.parent_last_name = dniData.data.apellidos;
+        }
+
+        if (parentData) {
+          current.id = parentData.id;
+          current.parent_first_name = parentData.first_name || current.parent_first_name;
+          current.parent_last_name = parentData.last_name || current.parent_last_name;
+          current.parent_phone = parentData.phone || current.parent_phone;
+          current.parent_email = parentData.User?.email || '';
+          current.has_account = Boolean(parentData.User?.id);
+        } else {
+          current.id = null;
+          current.has_account = false;
+          current.parent_email = '';
+        }
+
+        current.parent_password = '';
+        newParents[index] = current;
+        return { ...prev, parents: newParents };
+      });
     } catch (error) {
       console.error('Error buscando DNI:', error);
     } finally {
@@ -150,7 +188,14 @@ const StudentManagement = () => {
     } else {
       setNewStudent(prev => {
         const newParents = [...prev.parents];
-        newParents[index] = { ...newParents[index], parent_dni: value };
+        newParents[index] = {
+          ...newParents[index],
+          parent_dni: value,
+          id: null,
+          parent_email: '',
+          parent_password: '',
+          has_account: false
+        };
         return { ...prev, parents: newParents };
       });
       if (value.length === 8) handleDniLookup(value, 'parent', index);
@@ -297,6 +342,9 @@ const StudentManagement = () => {
                         <div key={parent.id} className="flex flex-col border-l-2 border-emerald-200 pl-2">
                           <span className="text-sm font-medium text-slate-700">{parent.first_name} {parent.last_name}</span>
                           <span className="text-xs text-slate-500">DNI: {parent.dni || 'N/A'} • {parent.phone || 'Sin tel.'}</span>
+                          <span className={`text-xs ${parent.User?.email ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            {parent.User?.email ? `Acceso: ${parent.User.email}` : 'Sin cuenta de acceso'}
+                          </span>
                         </div>
                       )) : (
                         <span className="text-sm text-slate-400">Sin apoderados</span>
@@ -444,7 +492,7 @@ const StudentManagement = () => {
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">DNI Apoderado</label>
                         <div className="relative">
-                          <input className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none pr-10"
+                          <input required className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none pr-10"
                             value={parent.parent_dni} onChange={e => handleDniChange(e, 'parent', index)} placeholder="8 dígitos" maxLength="8" />
                           {loadingParentDni[index] && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-emerald-500" size={18} />}
                         </div>
@@ -456,14 +504,53 @@ const StudentManagement = () => {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Nombres</label>
-                        <input className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                        <input required className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
                           value={parent.parent_first_name} onChange={e => handleParentChange(e, index, 'parent_first_name')} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Apellidos</label>
-                        <input className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                        <input required className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
                           value={parent.parent_last_name} onChange={e => handleParentChange(e, index, 'parent_last_name')} />
                       </div>
+                      {parent.has_account ? (
+                        <div className="md:col-span-2 p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+                          <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
+                            <Mail size={13} /> Cuenta de acceso existente: {parent.parent_email || 'cuenta vinculada'}
+                          </p>
+                          <p className="text-[11px] text-emerald-600 mt-1">
+                            Se reutilizará esta cuenta; no es necesario registrar nuevas credenciales.
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
+                              <Mail size={14} className="text-emerald-600" /> Correo de acceso
+                            </label>
+                            <input
+                              type="email"
+                              required
+                              placeholder="apoderado@correo.com"
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                              value={parent.parent_email}
+                              onChange={e => handleParentChange(e, index, 'parent_email')}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
+                              <Key size={14} className="text-emerald-600" /> Contraseña de acceso
+                            </label>
+                            <input
+                              type="password"
+                              required
+                              placeholder="Mínimo 6 caracteres"
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                              value={parent.parent_password}
+                              onChange={e => handleParentChange(e, index, 'parent_password')}
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}

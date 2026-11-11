@@ -22,6 +22,11 @@ const Parent = sequelize.define('Parent', {
   qr_code_uuid: {
     type: DataTypes.STRING,
     unique: true
+  },
+  user_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    unique: true
   }
 });
 
