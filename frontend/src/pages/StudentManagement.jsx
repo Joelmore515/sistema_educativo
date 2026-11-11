@@ -23,6 +23,7 @@ const createEmptyStudent = () => ({
   section: '',
   email: '',
   password: '',
+  web_access: false,
   parents: [createEmptyParent()]
 });
 
@@ -43,6 +44,9 @@ const StudentManagement = () => {
 
   const [loadingStudentDni, setLoadingStudentDni] = useState(false);
   const [loadingParentDni, setLoadingParentDni] = useState({});
+
+  const editingStudent = editingStudentId ? students.find(s => s.id === editingStudentId) : null;
+  const studentAccountExists = Boolean(editingStudent?.User?.id);
 
   const fetchData = async () => {
     try {
@@ -109,6 +113,7 @@ const StudentManagement = () => {
       section: sectionMatch ? sectionMatch[1].toUpperCase() : '',
       email: student.User?.email || '',
       password: '',
+      web_access: Boolean(student.User?.id),
       parents
     });
     setEditingStudentId(student.id);
@@ -227,6 +232,18 @@ const StudentManagement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const incompleteParent = newStudent.parents.find((parent, index) => (
+      !parent.has_account
+      && index > 0
+      && Boolean(parent.parent_email) !== Boolean(parent.parent_password)
+    ));
+
+    if (incompleteParent) {
+      alert('Completa el correo y la contraseña del apoderado secundario, o deja ambos campos vacíos.');
+      return;
+    }
+
     try {
       const payload = {
         first_name: newStudent.first_name,
@@ -234,8 +251,8 @@ const StudentManagement = () => {
         dni: newStudent.dni,
         grade_section: [newStudent.grade, newStudent.section].filter(Boolean).join(' '),
         parents: newStudent.parents,
-        email: newStudent.email ? newStudent.email.trim() : null,
-        password: newStudent.password ? newStudent.password.trim() : null
+        email: newStudent.web_access && newStudent.email ? newStudent.email.trim() : null,
+        password: newStudent.web_access && newStudent.password ? newStudent.password.trim() : null
       };
 
       if (editingStudentId) {
@@ -251,7 +268,7 @@ const StudentManagement = () => {
   };
 
   const handleDeleteStudent = async (studentId) => {
-    if (!window.confirm('¿Seguro que deseas eliminar este estudiante?')) return;
+    if (!window.confirm('¿Seguro que deseas eliminar este estudiante? Su apoderado y la cuenta de acceso del apoderado se conservarán.')) return;
 
     try {
       await api.delete(`/students/${studentId}`);
@@ -445,30 +462,58 @@ const StudentManagement = () => {
                     <input required className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
                       value={newStudent.last_name} onChange={e => setNewStudent({ ...newStudent, last_name: e.target.value })} />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
-                      <Mail size={14} className="text-emerald-600" /> Correo Institucional / Acceso
+                  <div className="md:col-span-2">
+                    <label className={`flex items-start gap-3 p-3 rounded-xl border transition-all ${
+                      studentAccountExists
+                        ? 'bg-emerald-50 border-emerald-200 cursor-not-allowed'
+                        : 'bg-slate-50 border-slate-200 cursor-pointer hover:bg-slate-100'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4 accent-emerald-600"
+                        checked={newStudent.web_access}
+                        disabled={studentAccountExists}
+                        onChange={e => setNewStudent({ ...newStudent, web_access: e.target.checked })}
+                      />
+                      <span>
+                        <span className="block text-sm font-medium text-slate-700">Habilitar acceso web al estudiante</span>
+                        <span className="block text-xs text-slate-500 mt-0.5">
+                          {studentAccountExists
+                            ? 'La cuenta ya existe. Para modificarla usa el cambio de contraseña o el correo registrado.'
+                            : 'Crea una cuenta para que el estudiante consulte su asistencia, reuniones y carnet QR.'}
+                        </span>
+                      </span>
                     </label>
-                    <input
-                      type="email"
-                      placeholder="estudiante@colegio.edu.pe"
-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
-                      value={newStudent.email}
-                      onChange={e => setNewStudent({ ...newStudent, email: e.target.value })}
-                    />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
-                      <Key size={14} className="text-emerald-600" /> {editingStudentId ? 'Cambiar Contraseña' : 'Contraseña de Acceso'}
-                    </label>
-                    <input
-                      type="password"
-                      placeholder={editingStudentId ? 'Dejar en blanco para mantener actual' : 'Por defecto DNI si se deja vacío'}
-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
-                      value={newStudent.password}
-                      onChange={e => setNewStudent({ ...newStudent, password: e.target.value })}
-                    />
-                  </div>
+                  {newStudent.web_access && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
+                          <Mail size={14} className="text-emerald-600" /> Correo de acceso
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          placeholder="estudiante@colegio.edu.pe"
+                          className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                          value={newStudent.email}
+                          onChange={e => setNewStudent({ ...newStudent, email: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
+                          <Key size={14} className="text-emerald-600" /> {editingStudentId ? 'Cambiar Contraseña' : 'Contraseña de Acceso'}
+                        </label>
+                        <input
+                          type="password"
+                          placeholder={editingStudentId ? 'Dejar en blanco para mantener actual' : 'Por defecto DNI si se deja vacío'}
+                          className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                          value={newStudent.password}
+                          onChange={e => setNewStudent({ ...newStudent, password: e.target.value })}
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -487,7 +532,14 @@ const StudentManagement = () => {
                         <X size={16} />
                       </button>
                     )}
-                    <h5 className="text-xs font-bold text-slate-500 mb-3">Apoderado {index + 1}</h5>
+                    <h5 className="text-xs font-bold text-slate-500 mb-3">
+                      Apoderado {index + 1}
+                      <span className={`ml-2 px-2 py-0.5 rounded-full ${
+                        index === 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'
+                      }`}>
+                        {index === 0 ? 'Principal' : 'Secundario'}
+                      </span>
+                    </h5>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">DNI Apoderado</label>
@@ -526,10 +578,11 @@ const StudentManagement = () => {
                           <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
                               <Mail size={14} className="text-emerald-600" /> Correo de acceso
+                              {index > 0 && <span className="text-[11px] font-normal text-slate-400">(opcional)</span>}
                             </label>
                             <input
                               type="email"
-                              required
+                              required={index === 0}
                               placeholder="apoderado@correo.com"
                               className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
                               value={parent.parent_email}
@@ -539,16 +592,22 @@ const StudentManagement = () => {
                           <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
                               <Key size={14} className="text-emerald-600" /> Contraseña de acceso
+                              {index > 0 && <span className="text-[11px] font-normal text-slate-400">(opcional)</span>}
                             </label>
                             <input
                               type="password"
-                              required
+                              required={index === 0}
                               placeholder="Mínimo 6 caracteres"
                               className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
                               value={parent.parent_password}
                               onChange={e => handleParentChange(e, index, 'parent_password')}
                             />
                           </div>
+                          {index > 0 && (
+                            <p className="md:col-span-2 text-[11px] text-slate-500">
+                              Si dejas correo y contraseña vacíos, el apoderado quedará vinculado sin acceso al portal.
+                            </p>
+                          )}
                         </>
                       )}
                     </div>

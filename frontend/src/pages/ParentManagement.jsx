@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
 import QrModal from '../components/QrModal';
-import { UserPlus, Search, Phone, Mail, QrCode, X, Loader2, Edit2, Trash2 } from 'lucide-react';
+import { Info, Search, Phone, Mail, QrCode, X, Loader2, Edit2, Trash2, Users } from 'lucide-react';
 
 const ParentManagement = () => {
   const [parents, setParents] = useState([]);
@@ -83,20 +84,27 @@ const ParentManagement = () => {
     }
   };
 
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingParent(null);
+    setNewParent(initialParentState);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!editingParent) return;
+
+    if (!newParent.has_account && Boolean(newParent.email) !== Boolean(newParent.password)) {
+      alert('Ingresa correo y contraseña juntos para crear la cuenta, o deja ambos campos vacíos.');
+      return;
+    }
+
     try {
-      if (editingParent) {
-        await api.put(`/parents/${editingParent}`, newParent);
-      } else {
-        await api.post('/parents', newParent);
-      }
-      setShowModal(false);
-      setEditingParent(null);
-      setNewParent(initialParentState);
+      await api.put(`/parents/${editingParent}`, newParent);
+      closeModal();
       fetchParents();
     } catch (error) {
-      alert(error.response?.data?.message || `Error al ${editingParent ? 'actualizar' : 'registrar'} padre`);
+      alert(error.response?.data?.message || 'Error al actualizar el apoderado');
     }
   };
 
@@ -114,14 +122,19 @@ const ParentManagement = () => {
     setShowModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar este padre?')) {
-      try {
-        await api.delete(`/parents/${id}`);
-        fetchParents();
-      } catch (error) {
-        alert(error.response?.data?.message || 'Error al eliminar padre');
-      }
+  const handleDelete = async (parent) => {
+    const linkedStudents = parent.Students || [];
+    const confirmMessage = linkedStudents.length > 0
+      ? `Este apoderado tiene ${linkedStudents.length} estudiante(s) vinculado(s). Se eliminarán sus vínculos y su cuenta de acceso. ¿Deseas continuar?`
+      : '¿Estás seguro de que deseas eliminar este apoderado?';
+
+    if (!window.confirm(confirmMessage)) return;
+
+    try {
+      await api.delete(`/parents/${parent.id}?force=true`);
+      fetchParents();
+    } catch (error) {
+      alert(error.response?.data?.message || 'Error al eliminar padre');
     }
   };
 
@@ -133,18 +146,21 @@ const ParentManagement = () => {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
         <h2 className="text-2xl font-bold text-slate-900">Gestión de Padres</h2>
-        <button 
-          type="button"
-          onClick={() => {
-            setEditingParent(null);
-            setNewParent(initialParentState);
-            setShowModal(true);
-          }}
-          className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200"
+        <Link
+          to="/dashboard/students"
+          className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
         >
-          <UserPlus size={20} className="mr-2" />
-          Nuevo Padre
-        </button>
+          <Users size={20} className="mr-2" />
+          Ir a Estudiantes
+        </Link>
+      </div>
+
+      <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 flex items-start gap-2">
+        <Info size={18} className="mt-0.5 shrink-0" />
+        <span>
+          Los apoderados se crean automáticamente al registrar un estudiante. Desde esta sección puedes
+          consultar sus datos, actualizar su cuenta de acceso y administrar sus vínculos.
+        </span>
       </div>
 
       <div className="relative">
@@ -164,6 +180,7 @@ const ParentManagement = () => {
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
               <th className="px-6 py-4 text-sm font-bold text-slate-600 uppercase">Nombre</th>
+              <th className="px-6 py-4 text-sm font-bold text-slate-600 uppercase">Estudiantes</th>
               <th className="px-6 py-4 text-sm font-bold text-slate-600 uppercase">Contacto</th>
               <th className="px-6 py-4 text-sm font-bold text-slate-600 uppercase text-center">Código QR</th>
               <th className="px-6 py-4 text-sm font-bold text-slate-600 uppercase text-right">Acciones</th>
@@ -171,9 +188,9 @@ const ParentManagement = () => {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan="4" className="px-6 py-10 text-center text-slate-400">Cargando...</td></tr>
+              <tr><td colSpan="5" className="px-6 py-10 text-center text-slate-400">Cargando...</td></tr>
             ) : filteredParents.length === 0 ? (
-              <tr><td colSpan="4" className="px-6 py-10 text-center text-slate-400">No se encontraron registros</td></tr>
+              <tr><td colSpan="5" className="px-6 py-10 text-center text-slate-400">No se encontraron registros</td></tr>
             ) : filteredParents.map(parent => (
               <tr key={parent.id} className="hover:bg-slate-50/50 transition-all">
                 <td className="px-6 py-4">
@@ -181,6 +198,22 @@ const ParentManagement = () => {
                     <span className="font-bold text-slate-900">{parent.first_name} {parent.last_name}</span>
                     <span className="text-xs text-slate-500 mt-1">DNI: {parent.dni || 'N/A'}</span>
                   </div>
+                </td>
+                <td className="px-6 py-4">
+                  {(parent.Students || []).length > 0 ? (
+                    <div className="flex flex-col space-y-1">
+                      {(parent.Students || []).map(student => (
+                        <span key={student.id} className="text-sm text-slate-700">
+                          {student.first_name} {student.last_name}
+                          {student.grade_section ? (
+                            <span className="text-xs text-slate-400"> · {student.grade_section}</span>
+                          ) : null}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs font-semibold text-amber-600">Sin estudiantes vinculados</span>
+                  )}
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex flex-col space-y-1">
@@ -207,7 +240,7 @@ const ParentManagement = () => {
                       <Edit2 size={18} />
                     </button>
                     <button 
-                      onClick={() => handleDelete(parent.id)}
+                      onClick={() => handleDelete(parent)}
                       className="p-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-all"
                       title="Eliminar"
                     >
@@ -227,8 +260,8 @@ const ParentManagement = () => {
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg max-h-[90vh] flex flex-col rounded-3xl shadow-2xl animate-in zoom-in duration-300 overflow-hidden my-8">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-              <h3 className="text-xl font-bold text-slate-900">{editingParent ? 'Editar Padre' : 'Registrar Nuevo Padre'}</h3>
-              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-slate-200 rounded-full transition-all text-slate-500">
+              <h3 className="text-xl font-bold text-slate-900">Editar Padre / Apoderado</h3>
+              <button onClick={closeModal} className="p-2 hover:bg-slate-200 rounded-full transition-all text-slate-500">
                 <X size={20} />
               </button>
             </div>
@@ -264,19 +297,22 @@ const ParentManagement = () => {
                   <p className="text-[11px] text-primary-600 mt-1">
                     {newParent.has_account
                       ? 'El apoderado ya tiene una cuenta. Puede cambiar el correo o dejar la contraseña vacía para mantenerla.'
-                      : 'El correo y la contraseña son obligatorios para crear la cuenta de acceso del apoderado.'}
+                      : 'Este apoderado aún no tiene cuenta. Ingresa correo y contraseña para crearla, o deja ambos vacíos para mantenerlo sin acceso.'}
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                  <input type="email" required className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Email {!newParent.has_account && <span className="text-[11px] font-normal text-slate-400">(opcional)</span>}
+                  </label>
+                  <input type="email" required={newParent.has_account} className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
                     value={newParent.email} onChange={e => setNewParent({...newParent, email: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Contraseña {!newParent.has_account && <span className="text-[11px] font-normal text-slate-400">(opcional)</span>}
+                  </label>
                   <input
                     type="password"
-                    required={!newParent.has_account}
                     placeholder={newParent.has_account ? 'Dejar vacío para mantener la actual' : 'Mínimo 6 caracteres'}
                     className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
                     value={newParent.password}
@@ -285,7 +321,7 @@ const ParentManagement = () => {
                 </div>
               </div>
               <button type="submit" className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all">
-                {editingParent ? 'Actualizar Registro' : 'Guardar Registro'}
+                Actualizar Registro
               </button>
             </form>
           </div>

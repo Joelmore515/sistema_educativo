@@ -35,7 +35,7 @@ const getRole = async (name, transaction) => {
   return role;
 };
 
-const ensureParentAccount = async (parent, parentData, transaction) => {
+const ensureParentAccount = async (parent, parentData, transaction, { requireAccount = true } = {}) => {
   if (parent.user_id) {
     const linkedUser = await User.findByPk(parent.user_id, { transaction });
     if (linkedUser) {
@@ -48,9 +48,12 @@ const ensureParentAccount = async (parent, parentData, transaction) => {
   const password = parentData.parent_password;
 
   if (!email || !password) {
+    if (!requireAccount) {
+      return parent;
+    }
     throw buildHttpError(
       400,
-      'El correo y la contraseña del apoderado son obligatorios para crear su cuenta de acceso'
+      'El apoderado principal necesita correo y contraseña para crear su cuenta de acceso'
     );
   }
 
@@ -72,7 +75,7 @@ const ensureParentAccount = async (parent, parentData, transaction) => {
   return parent;
 };
 
-const getOrCreateParent = async (parentData, transaction) => {
+const getOrCreateParent = async (parentData, transaction, options = {}) => {
   let parent = null;
 
   if (parentData.id) {
@@ -110,15 +113,15 @@ const getOrCreateParent = async (parentData, transaction) => {
     }
   }
 
-  await ensureParentAccount(parent, parentData, transaction);
+  await ensureParentAccount(parent, parentData, transaction, options);
   return parent;
 };
 
-const handleParentAssociation = async (student, parentData, transaction) => {
+const handleParentAssociation = async (student, parentData, transaction, options = {}) => {
   if (!parentData) return null;
   if (!parentData.id && !parentData.parent_dni) return null;
 
-  const parent = await getOrCreateParent(parentData, transaction);
+  const parent = await getOrCreateParent(parentData, transaction, options);
 
   await StudentParent.findOrCreate({
     where: {
@@ -146,7 +149,7 @@ exports.registerStudent = async (req, res) => {
 
     if (!Array.isArray(parents) || parents.length === 0) {
       return res.status(400).json({
-        message: 'Debe registrar al menos un apoderado con su correo y contraseña de acceso'
+        message: 'Debe registrar al menos un apoderado principal'
       });
     }
 
@@ -190,8 +193,10 @@ exports.registerStudent = async (req, res) => {
         user_id: userId
       }, { transaction });
 
-      for (const parentData of parents) {
-        const parent = await handleParentAssociation(createdStudent, parentData, transaction);
+      for (const [index, parentData] of parents.entries()) {
+        const parent = await handleParentAssociation(createdStudent, parentData, transaction, {
+          requireAccount: index === 0
+        });
         if (!parent) {
           throw buildHttpError(400, 'Los datos del apoderado están incompletos');
         }
@@ -310,8 +315,10 @@ exports.updateStudent = async (req, res) => {
       await student.save({ transaction });
 
       if (parents && Array.isArray(parents)) {
-        for (const parentData of parents) {
-          await handleParentAssociation(student, parentData, transaction);
+        for (const [index, parentData] of parents.entries()) {
+          await handleParentAssociation(student, parentData, transaction, {
+            requireAccount: index === 0
+          });
         }
       }
     });

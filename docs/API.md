@@ -61,7 +61,9 @@ Recuperación de contraseña:
 | PUT | `/students/:id` | `admin`, `director` |
 | DELETE | `/students/:id` | `admin`, `director` |
 
-Al registrar o actualizar un estudiante se debe enviar al menos un apoderado. Si el apoderado es nuevo o aún no tiene cuenta, `parent_email` y `parent_password` son obligatorios. Si ya tiene `user_id`, la cuenta existente se reutiliza.
+Al registrar o actualizar un estudiante se debe enviar al menos un apoderado. El primer apoderado es el principal: si no tiene cuenta, `parent_email` y `parent_password` son obligatorios. Los apoderados adicionales pueden quedar sin cuenta si se omiten ambos campos. Si un apoderado ya tiene `user_id`, la cuenta existente se reutiliza (por ejemplo, hermanos). El acceso web del estudiante es opcional: se crea solo cuando se envía `email`.
+
+`DELETE /students/:id` elimina al estudiante, su cuenta de usuario y sus vínculos con apoderados; el apoderado y su cuenta se conservan para poder reutilizarlos.
 
 ## Padres
 
@@ -73,7 +75,7 @@ Al registrar o actualizar un estudiante se debe enviar al menos un apoderado. Si
 | PUT | `/parents/:id` | `admin`, `director` |
 | DELETE | `/parents/:id` | `admin`, `director` |
 
-`POST /parents` requiere `email` y `password` para crear la cuenta de acceso con rol `padre`. En `PUT /parents/:id`, si el apoderado no tiene cuenta, también son obligatorios; si ya la tiene, la contraseña solo se actualiza cuando se envía.
+La creación de apoderados se realiza desde el registro o edición de un estudiante. `POST /parents` se mantiene por compatibilidad de API, pero la UI no lo utiliza. En `PUT /parents/:id`, si el apoderado no tiene cuenta, `email` y `password` deben enviarse juntos para crearla o ambos omitirse para conservarlo sin acceso; si ya la tiene, la contraseña solo se actualiza cuando se envía. `DELETE /parents/:id` responde `409` si el apoderado tiene estudiantes vinculados, salvo que se envíe `force=true`.
 
 ## Asistencia
 

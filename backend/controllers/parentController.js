@@ -1,4 +1,4 @@
-const { Parent, User, Role, StudentParent } = require('../models');
+const { Parent, User, Role, Student, StudentParent } = require('../models');
 const sequelize = require('../config/db');
 const bcrypt = require('bcryptjs');
 const { generateQR } = require('../utils/qrGenerator');
@@ -97,7 +97,14 @@ exports.registerParent = async (req, res) => {
 exports.getAllParents = async (req, res) => {
   try {
     const parents = await Parent.findAll({
-      include: [getUserInclude()],
+      include: [
+        getUserInclude(),
+        {
+          model: Student,
+          attributes: ['id', 'first_name', 'last_name', 'grade_section'],
+          through: { attributes: [] }
+        }
+      ],
       order: [['id', 'ASC']]
     });
     res.json(parents);
@@ -178,11 +185,11 @@ exports.updateParent = async (req, res) => {
         if (Object.keys(updates).length > 0) {
           await user.update(updates, { transaction });
         }
-      } else {
+      } else if (normalizedEmail || password) {
         if (!normalizedEmail || !password) {
           throw buildHttpError(
             400,
-            'Debe registrar un correo y una contraseña para crear la cuenta de acceso del apoderado'
+            'Debe enviar correo y contraseña juntos para crear la cuenta de acceso del apoderado'
           );
         }
 
@@ -225,10 +232,21 @@ exports.updateParent = async (req, res) => {
 exports.deleteParent = async (req, res) => {
   try {
     const { id } = req.params;
-    const parent = await Parent.findByPk(id);
+    const parent = await Parent.findByPk(id, {
+      include: [{ model: Student, attributes: ['id'], through: { attributes: [] } }]
+    });
 
     if (!parent) {
       return res.status(404).json({ message: 'Padre no encontrado' });
+    }
+
+    const linkedStudents = parent.Students || [];
+
+    if (linkedStudents.length > 0 && req.query.force !== 'true') {
+      return res.status(409).json({
+        message: `El apoderado tiene ${linkedStudents.length} estudiante(s) vinculado(s). Confirma la eliminación para continuar.`,
+        student_count: linkedStudents.length
+      });
     }
 
     await sequelize.transaction(async (transaction) => {
